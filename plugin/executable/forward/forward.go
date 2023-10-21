@@ -21,9 +21,9 @@ package fastforward
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -33,32 +33,32 @@ import (
 	"github.com/IrineSistiana/mosdns/v5/pkg/utils"
 	"github.com/IrineSistiana/mosdns/v5/plugin/executable/sequence"
 	"github.com/miekg/dns"
-	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 )
 
 const PluginType = "forward"
 
+var defaultQueryTimeout time.Duration
+
 func init() {
+	defaultQueryTimeout = getDefaultQueryTimeout()
 	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 	sequence.MustRegExecQuickSetup(PluginType, quickSetup)
 }
 
 const (
 	maxConcurrentQueries = 3
-	queryTimeout         = time.Second * 5
 )
 
 type Args struct {
 	Upstreams  []UpstreamConfig `yaml:"upstreams"`
 	Concurrent int              `yaml:"concurrent"`
+	QTime      int              `yaml:"qtime"`
 
 	// Global options.
 	Socks5       string `yaml:"socks5"`
 	SoMark       int    `yaml:"so_mark"`
 	BindToDevice string `yaml:"bind_to_device"`
-	Bootstrap    string `yaml:"bootstrap"`
-	BootstrapVer int    `yaml:"bootstrap_version"`
 }
 
 type UpstreamConfig struct {
@@ -68,23 +68,31 @@ type UpstreamConfig struct {
 	IdleTimeout        int    `yaml:"idle_timeout"`
 	MaxConns           int    `yaml:"max_conns"`
 	EnablePipeline     bool   `yaml:"enable_pipeline"`
-	EnableHTTP3        bool   `yaml:"enable_http3"`
 	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
 
 	Socks5       string `yaml:"socks5"`
 	SoMark       int    `yaml:"so_mark"`
 	BindToDevice string `yaml:"bind_to_device"`
-	Bootstrap    string `yaml:"bootstrap"`
-	BootstrapVer int    `yaml:"bootstrap_version"`
+}
+
+func getDefaultQueryTimeout() time.Duration {
+	QUERY_TIME := os.Getenv("QUERY_TIME")
+	if QUERY_TIME == "" {
+		return time.Second * 3
+	}
+
+	duration, err := time.ParseDuration(QUERY_TIME)
+	if err != nil {
+		fmt.Printf("Failed to parse QUERY_TIME value: %v\n", err)
+		return time.Second * 3
+	}
+
+	return duration
 }
 
 func Init(bp *coremain.BP, args any) (any, error) {
 	f, err := NewForward(args.(*Args), Opts{Logger: bp.L(), MetricsTag: bp.Tag()})
 	if err != nil {
-		return nil, err
-	}
-	if err := f.RegisterMetricsTo(prometheus.WrapRegistererWithPrefix(PluginType+"_", bp.M().GetMetricsReg())); err != nil {
-		_ = f.Close()
 		return nil, err
 	}
 	return f, nil
@@ -126,8 +134,6 @@ func NewForward(args *Args, opt Opts) (*Forward, error) {
 		utils.SetDefaultString(&c.Socks5, args.Socks5)
 		utils.SetDefaultUnsignNum(&c.SoMark, args.SoMark)
 		utils.SetDefaultString(&c.BindToDevice, args.BindToDevice)
-		utils.SetDefaultString(&c.Bootstrap, args.Bootstrap)
-		utils.SetDefaultUnsignNum(&c.BootstrapVer, args.BootstrapVer)
 	}
 
 	for i, c := range args.Upstreams {
@@ -145,15 +151,7 @@ func NewForward(args *Args, opt Opts) (*Forward, error) {
 			IdleTimeout:    time.Duration(c.IdleTimeout) * time.Second,
 			MaxConns:       c.MaxConns,
 			EnablePipeline: c.EnablePipeline,
-			EnableHTTP3:    c.EnableHTTP3,
-			Bootstrap:      c.Bootstrap,
-			BootstrapVer:   c.BootstrapVer,
-			TLSConfig: &tls.Config{
-				InsecureSkipVerify: c.InsecureSkipVerify,
-				ClientSessionCache: tls.NewLRUClientSessionCache(4),
-			},
-			Logger:        opt.Logger,
-			EventObserver: uw,
+			Logger:         opt.Logger,
 		}
 
 		u, err := upstream.NewUpstream(c.Addr, uOpt)
@@ -174,19 +172,6 @@ func NewForward(args *Args, opt Opts) (*Forward, error) {
 	}
 
 	return f, nil
-}
-
-func (f *Forward) RegisterMetricsTo(r prometheus.Registerer) error {
-	for _, wu := range f.us {
-		// Only register metrics for upstream that has a tag.
-		if len(wu.cfg.Tag) == 0 {
-			continue
-		}
-		if err := wu.registerMetricsTo(r); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (f *Forward) Exec(ctx context.Context, qCtx *query_context.Context) (err error) {
@@ -215,7 +200,7 @@ func (f *Forward) QuickConfigureExec(args string) (any, error) {
 	var execFunc sequence.ExecutableFunc = func(ctx context.Context, qCtx *query_context.Context) error {
 		r, err := f.exchange(ctx, qCtx, us)
 		if err != nil {
-			return err
+			return nil
 		}
 		qCtx.SetResponse(r)
 		return nil
@@ -234,7 +219,11 @@ func (f *Forward) exchange(ctx context.Context, qCtx *query_context.Context, us 
 	if len(us) == 0 {
 		return nil, errors.New("no upstream to exchange")
 	}
+	queryTimeout := defaultQueryTimeout
 
+	if f.args.QTime > 0 {
+		queryTimeout = time.Duration(f.args.QTime) * time.Millisecond
+	}
 	mcq := f.args.Concurrent
 	if mcq <= 0 {
 		mcq = 1

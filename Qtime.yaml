@@ -1,0 +1,55 @@
+log:
+    file: ""
+    level: debug
+plugins:
+
+  - tag: try_local
+    type: forward
+    args:
+      qtime: 10
+      upstreams:
+        - addr: "udp://10.10.10.8:5301"
+
+  - tag: try_fake
+    type: forward
+    args:
+      qtime: 10
+      upstreams:
+        - addr: "udp://10.10.10.3"
+
+  - tag: try_chinanet
+    type: forward
+    args:
+      concurrent: 2
+      upstreams:
+        - addr: "udp://202.96.128.86"
+        - addr: "udp://202.96.134.33"
+
+
+  - tag: main_sequence
+    type: sequence
+    args:
+        - exec: $try_local
+        - matches: "!rcode 0"
+          exec: $try_fake
+        - matches: has_wanted_ans
+          exec: accept
+        - exec: query_summary qtime_out
+        - exec: $try_chinanet
+        - matches: has_wanted_ans
+          exec: accept
+        - exec: reject 0
+
+  - tag: udp_server
+    type: udp_server
+    args:
+      entry: main_sequence
+      listen: :5301
+  - tag: "tcp_server"
+    type: "tcp_server"
+    args:
+      entry: main_sequence
+      listen: :5301
+      idle_timeout: 5
+  - tag: "httpd_server"
+    type: "httpd_server"

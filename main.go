@@ -21,16 +21,15 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/IrineSistiana/mosdns/v5/coremain"
 	"github.com/IrineSistiana/mosdns/v5/mlog"
 	_ "github.com/IrineSistiana/mosdns/v5/plugin"
-	_ "github.com/IrineSistiana/mosdns/v5/tools"
 	"github.com/spf13/cobra"
-	_ "net/http/pprof"
 )
 
 var (
-	version = "dev/unknown"
+	version = "kkkgo/PaoPaoDNS"
 )
 
 func init() {
@@ -39,6 +38,13 @@ func init() {
 		Short: "Print out version info and exit.",
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Println(version)
+		},
+	})
+	coremain.AddSubCmd(&cobra.Command{
+		Use:   "AddMod",
+		Short: "AddMod for mosdns.yaml",
+		Run: func(cmd *cobra.Command, args []string) {
+			coremain.AddMod()
 		},
 	})
 }

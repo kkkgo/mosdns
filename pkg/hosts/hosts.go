@@ -22,11 +22,11 @@ package hosts
 import (
 	"errors"
 	"fmt"
-	"github.com/IrineSistiana/mosdns/v5/pkg/dnsutils"
-	"github.com/IrineSistiana/mosdns/v5/pkg/matcher/domain"
-	"github.com/miekg/dns"
 	"net/netip"
 	"strings"
+
+	"github.com/IrineSistiana/mosdns/v5/pkg/matcher/domain"
+	"github.com/miekg/dns"
 )
 
 type Hosts struct {
@@ -95,9 +95,8 @@ func (h *Hosts) LookupMsg(m *dns.Msg) *dns.Msg {
 		}
 	}
 
-	// Append fake SOA record for empty reply.
 	if len(r.Answer) == 0 {
-		r.Ns = []dns.RR{dnsutils.FakeSOA(fqdn)}
+		r.Ns = []dns.RR{}
 	}
 	return r
 }

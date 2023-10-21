@@ -21,23 +21,27 @@ package dual_selector
 
 import (
 	"context"
-	"github.com/IrineSistiana/mosdns/v5/pkg/dnsutils"
+	"os"
+	"time"
+
 	"github.com/IrineSistiana/mosdns/v5/pkg/pool"
 	"github.com/IrineSistiana/mosdns/v5/pkg/query_context"
 	"github.com/IrineSistiana/mosdns/v5/plugin/executable/sequence"
 	"github.com/miekg/dns"
 	"go.uber.org/zap"
-	"time"
 )
 
 const (
-	referenceWaitTimeout     = time.Millisecond * 500
-	defaultSubRoutineTimeout = time.Second * 5
+	referenceWaitTimeout     = time.Millisecond * 400
+	defaultSubRoutineTimeout = time.Millisecond * 4400
 )
 
 func init() {
 	sequence.MustRegExecQuickSetup("prefer_ipv4", func(bq sequence.BQ, _ string) (any, error) {
-		return NewPreferIpv4(bq), nil
+		if os.Getenv("ADDINFO") == "yes" {
+			return NewPreferIpv4(bq, true), nil
+		}
+		return NewPreferIpv4(bq, false), nil
 	})
 	sequence.MustRegExecQuickSetup("prefer_ipv6", func(bq sequence.BQ, _ string) (any, error) {
 		return NewPreferIpv6(bq), nil
@@ -48,7 +52,8 @@ var _ sequence.RecursiveExecutable = (*Selector)(nil)
 
 type Selector struct {
 	sequence.BQ
-	prefer uint16 // dns.TypeA or dns.TypeAAAA
+	prefer  uint16 // dns.TypeA or dns.TypeAAAA
+	addinfo bool
 }
 
 // Exec implements handler.Executable.
@@ -114,8 +119,13 @@ func (s *Selector) Exec(ctx context.Context, qCtx *query_context.Context, next s
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-shouldBlock: // Reference indicates we should block this query before the original query finished.
-		r := dnsutils.GenEmptyReply(q, dns.RcodeSuccess)
-		qCtx.SetResponse(r)
+		if s.addinfo {
+			r := BlockRecordv6(q)
+			qCtx.SetResponse(r)
+		} else {
+			r := BlockRecord0(q)
+			qCtx.SetResponse(r)
+		}
 		return nil
 	case err := <-doneChan: // The original query finished. Waiting for reference.
 		waitTimeoutTimer := pool.GetTimer(referenceWaitTimeout)
@@ -124,8 +134,13 @@ func (s *Selector) Exec(ctx context.Context, qCtx *query_context.Context, next s
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-shouldBlock:
-			r := dnsutils.GenEmptyReply(q, dns.RcodeSuccess)
-			qCtx.SetResponse(r)
+			if s.addinfo {
+				r := BlockRecordv6(q)
+				qCtx.SetResponse(r)
+			} else {
+				r := BlockRecord0(q)
+				qCtx.SetResponse(r)
+			}
 			return nil
 		case <-shouldPass:
 			*qCtx = *qCtxOrg // replace qCtx
@@ -139,17 +154,42 @@ func (s *Selector) Exec(ctx context.Context, qCtx *query_context.Context, next s
 	}
 }
 
-func NewPreferIpv4(bq sequence.BQ) *Selector {
+func BlockRecord0(q *dns.Msg) *dns.Msg {
+	r := new(dns.Msg)
+	r.SetRcode(q, 0)
+	r.Answer = []dns.RR{}
+	return r
+}
+
+func BlockRecordv6(q *dns.Msg) *dns.Msg {
+	r := new(dns.Msg)
+	r.SetRcode(q, 0)
+	r.Answer = []dns.RR{}
+	txtRecord := new(dns.TXT)
+	txtRecord.Hdr = dns.RR_Header{
+		Name:   time.Now().Format("20060102150405.000") + ".block.paopaodns.",
+		Rrtype: dns.TypeTXT,
+		Class:  dns.ClassINET,
+		Ttl:    0,
+	}
+	txtRecord.Txt = []string{"Records may exist, but blocked by PaoPaoDNS IPV6 option."}
+	r.Extra = append(r.Extra, txtRecord)
+	return r
+}
+
+func NewPreferIpv4(bq sequence.BQ, addinfo bool) *Selector {
 	return &Selector{
-		BQ:     bq,
-		prefer: dns.TypeA,
+		BQ:      bq,
+		prefer:  dns.TypeA,
+		addinfo: addinfo,
 	}
 }
 
 func NewPreferIpv6(bq sequence.BQ) *Selector {
 	return &Selector{
-		BQ:     bq,
-		prefer: dns.TypeAAAA,
+		BQ:      bq,
+		prefer:  dns.TypeAAAA,
+		addinfo: false,
 	}
 }
 

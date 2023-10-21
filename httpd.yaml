@@ -1,0 +1,37 @@
+log:
+    file: ""
+    level: debug
+
+plugins:
+  - tag: try_chinanet
+    type: forward
+    args:
+      concurrent: 3
+      upstreams:
+        - addr: "udp://202.96.128.86"
+        - addr: "udp://202.96.134.33"
+        - addr: "udp://223.5.5.5"
+
+  - tag: main_sequence
+    type: sequence
+    args:
+        - exec: prefer_ipv4 
+        - exec: $try_chinanet
+        - exec: ttl 1-3
+        - matches: has_wanted_ans
+          exec: accept
+        - exec: reject 0
+        
+  - tag: udp_server
+    type: udp_server
+    args:
+      entry: main_sequence
+      listen: :53
+  - tag: "tcp_server"
+    type: "tcp_server"
+    args:
+      entry: main_sequence
+      listen: :53
+      idle_timeout: 3
+  - tag: "httpd_server"
+    type: "httpd_server"

@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	defaultQueryTimeout = time.Second * 5
+	defaultQueryTimeout = time.Millisecond * 4500
 )
 
 var (

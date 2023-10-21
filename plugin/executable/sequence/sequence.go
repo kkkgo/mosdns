@@ -21,6 +21,7 @@ package sequence
 
 import (
 	"context"
+
 	"github.com/IrineSistiana/mosdns/v5/coremain"
 	"github.com/IrineSistiana/mosdns/v5/pkg/query_context"
 )
@@ -31,7 +32,9 @@ func init() {
 	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 
 	MustRegExecQuickSetup("accept", setupAccept)
+	MustRegExecQuickSetup("respond", setupRespond)
 	MustRegExecQuickSetup("reject", setupReject)
+	MustRegExecQuickSetup("pong", setupPong)
 	MustRegExecQuickSetup("return", setupReturn)
 	MustRegExecQuickSetup("goto", setupGoto)
 	MustRegExecQuickSetup("jump", setupJump)
