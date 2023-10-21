@@ -138,7 +138,8 @@ func genSwaps(swaps []SwapsConfig) (string, string) {
 		ipsetText.WriteString(fmt.Sprintf(`  - tag: ip_set@%s
     type: ip_set
     args:
-        - files: "%s"
+        files:
+          - "%s"
 `, swap.Env_key, swap.Cidr_file))
 
 		//gen resp match
