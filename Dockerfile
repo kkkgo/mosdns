@@ -1,12 +1,14 @@
-FROM golang:latest as builder
-ARG CGO_ENABLED=0
+FROM alpine:edge AS check
+RUN apk add --no-cache go
+WORKDIR /src
+COPY . /src/
+RUN rm go.mod go.sum
+RUN go mod init github.com/IrineSistiana/mosdns/v5
+RUN go get -u
+RUN go build -ldflags "-s -w" -trimpath -o /usr/bin/mosdns
+ADD https://raw.githubusercontent.com/kkkgo/Country-only-cn-private.mmdb/main/Country-only-cn-private.mmdb /src/
+RUN sh /src/test.sh
 
-COPY ./ /root/src/
-WORKDIR /root/src/
-RUN go build -ldflags "-s -w -X main.version=$(git describe --tags --long --always)" -trimpath -o mosdns
-
-FROM alpine:latest
-
-COPY --from=builder /root/src/mosdns /usr/bin/
-
-RUN apk add --no-cache ca-certificates
+FROM check
+WORKDIR /src
+CMD rm go.mod go.sum && go mod init github.com/IrineSistiana/mosdns/v5 && go get -u

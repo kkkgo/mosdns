@@ -1,0 +1,83 @@
+log:
+    file: ""
+    level: debug
+
+plugins:
+  - tag: "ip_rewrite"
+    type: "ip_set"
+    args:
+     ips:
+       - "1.1.1.1"
+       - "2001:4860:4860::8888"
+
+  - tag: cnip
+    type: mmdb
+    args:
+      file: "/src/Country-only-cn-private.mmdb"
+
+  - tag: try_404
+    type: forward
+    args:
+      qtime: 1000
+      upstreams:
+        - addr: "udp://10.0.40.4"
+
+  - tag: try_cf
+    type: forward
+    args:
+      qtime: 1000
+      upstreams:
+        - addr: "udp://1.1.1.1"
+
+  - tag: main_sequence
+    type: sequence
+    args:
+        - exec: $try_404
+        - matches: has_wanted_ans
+          exec: respond try_404
+        - matches: qname test1.dns
+          exec: black_hole 114.114.114.114 2400:3200:baba::1
+        - matches: qname test2.dns
+          exec: black_hole 119.29.29.29 2402:4e00::1
+        - matches: qname test3.dns
+          exec: black_hole 223.5.5.5 2400:da00::6666
+        - matches: qname test3.dns
+          exec: black_hole 180.76.76.76 240e:4c:4008::1
+        - matches: qname test4.dns
+          exec: black_hole 101.226.4.6 2408:8899::8
+        - matches: qname test5.dns
+          exec: black_hole 218.30.118.6 2409:8088::a
+        - matches: qname test6.dns
+          exec: black_hole 123.125.81.6 240C::6666
+        - matches: qname test7.dns
+          exec: black_hole 140.207.198.6 2001:dc7:1000::1
+        - matches: qname test8.dns
+          exec: black_hole 1.2.4.8 2001:da8:8000:1:202:120:2:100
+        - matches: qname test9.dns
+          exec: black_hole 117.50.10.10 2001:cc0:2fff:1::6666
+        - matches: qname test0.dns
+          exec: black_hole 52.80.52.52 2001:da8:208:10::6
+        - matches: qname ip_rewrite.dns
+          exec: black_hole 1.1.1.1 2001:4860:4860::8888
+        - matches: resp_ip $ip_rewrite
+          exec: ip_rewrite cf_ip
+        - matches: resp_ip_mmdb $cnip CN
+          exec: respond blackhole.
+        - exec: $try_cf
+        - matches: has_wanted_ans
+          exec: respond try_cf
+        - exec: pong anyway failed.
+
+  - tag: udp_server
+    type: udp_server
+    args:
+      entry: main_sequence
+      listen: :53
+  - tag: "tcp_server"
+    type: "tcp_server"
+    args:
+      entry: main_sequence
+      listen: :5301
+      idle_timeout: 5
+  - tag: "httpd_server"
+    type: "httpd_server"
