@@ -1,4 +1,5 @@
 #!/bin/sh
+export cf_ip="0.1.2.3 2000::8888"
 mosdns start -d /src -c test.yaml &
 sleep 3
 nslookup test1.dns 127.0.0.1
@@ -12,3 +13,4 @@ nslookup test8.dns 127.0.0.1
 nslookup test9.dns 127.0.0.1
 nslookup test0.dns 127.0.0.1
 curl http://127.0.0.1:7889
+nslookup ip_rewrite.dns 127.0.0.1
