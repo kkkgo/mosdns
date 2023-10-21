@@ -53,12 +53,12 @@ func AddMod() {
 	//get yaml config.
 	f, s, q := genZones(config.Zones)
 	i, r := genSwaps(config.Swaps)
-	insertAfterKeyStart("forward_zones_dns_start", f)
-	insertAfterKeyStart("forward_zones_seq_start", s)
-	insertAfterKeyStart("forward_zones_qname_start", q)
-	insertAfterKeyStart("forward_swaps_ipset_start", i)
-	insertAfterKeyStart("forward_swaps_match1_start", r)
-	insertAfterKeyStart("forward_swaps_match2_start", r)
+	insertAfterKeyStart("zones_dns_start", f)
+	insertAfterKeyStart("zones_seq_start", s)
+	insertAfterKeyStart("zones_qname_start", q)
+	insertAfterKeyStart("swaps_ipset_start", i)
+	insertAfterKeyStart("swaps_match1_start", r)
+	insertAfterKeyStart("swaps_match2_start", r)
 	// fmt.Println(allcontent)
 
 	outputFilePath := "/tmp/mosdns_mod.yaml"
