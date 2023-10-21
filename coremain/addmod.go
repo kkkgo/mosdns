@@ -59,7 +59,7 @@ func AddMod() {
 	insertAfterKeyStart("forward_swaps_ipset_start", i)
 	insertAfterKeyStart("forward_swaps_match1_start", r)
 	insertAfterKeyStart("forward_swaps_match2_start", r)
-	fmt.Println(allcontent)
+	// fmt.Println(allcontent)
 
 	outputFilePath := "/tmp/mosdns_mod.yaml"
 	if err := writeToFile(outputFilePath); err != nil {
