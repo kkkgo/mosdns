@@ -32,13 +32,13 @@ func AddMod() {
 	viper.SetConfigFile("/data/custom_mod.yaml")
 	err := viper.ReadInConfig()
 	if err != nil {
-		fmt.Printf("Unable Load: %s\n", err)
+		fmt.Printf("Unable Load Custom_mod: %s\n", err)
 		return
 	}
 	var config AddModConfig
 	err = viper.Unmarshal(&config)
 	if err != nil {
-		fmt.Printf("Error unmarshaling config: %s\n", err)
+		fmt.Printf("Error unmarshaling Custom_mod: %s\n", err)
 		return
 	}
 	// fmt.Println(config.Zones)
@@ -105,15 +105,15 @@ func genZones(zones []ZoneConfig) (string, string, string) {
 
 		//gen seq
 		sequenceText.WriteString(fmt.Sprintf(`  - tag: sequence@%s
-		type: sequence
-		args:
-			- exec: $forward_zones@%s
+    type: sequence
+    args:
+        - exec: $forward_zones@%s
 `, zone.Zone, zone.Zone))
 		if zone.TTL > 0 {
-			sequenceText.WriteString(fmt.Sprintf(`      - exec: ttl 0-%d
+			sequenceText.WriteString(fmt.Sprintf(`        - exec: ttl 0-%d
 `, zone.TTL))
 		}
-		sequenceText.WriteString(fmt.Sprintf(`	    - exec: respond forward_zones@%s
+		sequenceText.WriteString(fmt.Sprintf(`        - exec: respond forward_zones@%s
 `, zone.Zone))
 
 		//gen qname match
@@ -136,9 +136,9 @@ func genSwaps(swaps []SwapsConfig) (string, string) {
 		}
 
 		ipsetText.WriteString(fmt.Sprintf(`  - tag: ip_set@%s
-		type: ip_set
-		args:
-			- files: "%s"
+    type: ip_set
+    args:
+        - files: "%s"
 `, swap.Env_key, swap.Cidr_file))
 
 		//gen resp match
