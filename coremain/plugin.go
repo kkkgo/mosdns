@@ -21,11 +21,11 @@ package coremain
 
 import (
 	"fmt"
-	"github.com/IrineSistiana/mosdns/v5/pkg/utils"
-	"github.com/go-chi/chi/v5"
-	"go.uber.org/zap"
 	"reflect"
 	"sync"
+
+	"github.com/IrineSistiana/mosdns/v5/pkg/utils"
+	"go.uber.org/zap"
 )
 
 // NewPluginArgsFunc represents a func that creates a new args object.
@@ -192,10 +192,4 @@ func (p *BP) M() *Mosdns {
 // a test environment.
 func (p *BP) Tag() string {
 	return p.tag
-}
-
-// RegAPI mounts mux to mosdns api. Note: Plugins MUST NOT call RegAPI twice.
-// Since mounting same path to root chi.Mux causes runtime panic.
-func (p *BP) RegAPI(mux *chi.Mux) {
-	p.m.RegPluginAPI(p.tag, mux)
 }

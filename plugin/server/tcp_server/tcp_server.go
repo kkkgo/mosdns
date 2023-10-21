@@ -20,7 +20,6 @@
 package tcp_server
 
 import (
-	"crypto/tls"
 	"fmt"
 	"net"
 	"time"
@@ -70,23 +69,10 @@ func StartServer(bp *coremain.BP, args *Args) (*TcpServer, error) {
 		return nil, fmt.Errorf("failed to init dns handler, %w", err)
 	}
 
-	// Init tls
-	var tc *tls.Config
-	if len(args.Key)+len(args.Cert) > 0 {
-		tc = new(tls.Config)
-		if err := server.LoadCert(tc, args.Cert, args.Key); err != nil {
-			return nil, fmt.Errorf("failed to read tls cert, %w", err)
-		}
-	}
-
 	l, err := net.Listen("tcp", args.Listen)
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen socket, %w", err)
 	}
-	if tc != nil {
-		l = tls.NewListener(l, tc)
-	}
-
 	go func() {
 		defer l.Close()
 		serverOpts := server.TCPServerOpts{Logger: bp.L(), IdleTimeout: time.Duration(args.IdleTimeout) * time.Second}

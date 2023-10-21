@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"strconv"
 	"sync"
@@ -38,10 +37,8 @@ import (
 	"github.com/IrineSistiana/mosdns/v5/pkg/query_context"
 	"github.com/IrineSistiana/mosdns/v5/pkg/utils"
 	"github.com/IrineSistiana/mosdns/v5/plugin/executable/sequence"
-	"github.com/go-chi/chi/v5"
 	"github.com/klauspost/compress/gzip"
 	"github.com/miekg/dns"
-	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 	"golang.org/x/sync/singleflight"
 	"google.golang.org/protobuf/proto"
@@ -89,23 +86,12 @@ type Cache struct {
 	closeOnce    sync.Once
 	closeNotify  chan struct{}
 	updatedKey   atomic.Uint64
-
-	queryTotal   prometheus.Counter
-	hitTotal     prometheus.Counter
-	lazyHitTotal prometheus.Counter
-	size         prometheus.GaugeFunc
 }
 
 func Init(bp *coremain.BP, args any) (any, error) {
 	c := NewCache(args.(*Args), Opts{
-		Logger:     bp.L(),
-		MetricsTag: bp.Tag(),
+		Logger: bp.L(),
 	})
-
-	if err := c.RegMetricsTo(prometheus.WrapRegistererWithPrefix(PluginType+"_", bp.M().GetMetricsReg())); err != nil {
-		return nil, fmt.Errorf("failed to register metrics, %w", err)
-	}
-	bp.RegAPI(c.Api())
 	return c, nil
 }
 
@@ -138,35 +124,11 @@ func NewCache(args *Args, opts Opts) *Cache {
 	}
 
 	backend := cache.New[key, *item](cache.Opts{Size: args.Size})
-	lb := map[string]string{"tag": opts.MetricsTag}
 	p := &Cache{
 		args:        args,
 		logger:      logger,
 		backend:     backend,
 		closeNotify: make(chan struct{}),
-
-		queryTotal: prometheus.NewCounter(prometheus.CounterOpts{
-			Name:        "query_total",
-			Help:        "The total number of processed queries",
-			ConstLabels: lb,
-		}),
-		hitTotal: prometheus.NewCounter(prometheus.CounterOpts{
-			Name:        "hit_total",
-			Help:        "The total number of queries that hit the cache",
-			ConstLabels: lb,
-		}),
-		lazyHitTotal: prometheus.NewCounter(prometheus.CounterOpts{
-			Name:        "lazy_hit_total",
-			Help:        "The total number of queries that hit the expired cache",
-			ConstLabels: lb,
-		}),
-		size: prometheus.NewGaugeFunc(prometheus.GaugeOpts{
-			Name:        "size_current",
-			Help:        "Current cache size in records",
-			ConstLabels: lb,
-		}, func() float64 {
-			return float64(backend.Len())
-		}),
 	}
 
 	if err := p.loadDump(); err != nil {
@@ -177,17 +139,7 @@ func NewCache(args *Args, opts Opts) *Cache {
 	return p
 }
 
-func (c *Cache) RegMetricsTo(r prometheus.Registerer) error {
-	for _, collector := range [...]prometheus.Collector{c.queryTotal, c.hitTotal, c.lazyHitTotal, c.size} {
-		if err := r.Register(collector); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (c *Cache) Exec(ctx context.Context, qCtx *query_context.Context, next sequence.ChainWalker) error {
-	c.queryTotal.Inc()
 	q := qCtx.Q()
 
 	msgKey := getMsgKey(q)
@@ -197,11 +149,9 @@ func (c *Cache) Exec(ctx context.Context, qCtx *query_context.Context, next sequ
 
 	cachedResp, lazyHit := getRespFromCache(msgKey, c.backend, c.args.LazyCacheTTL > 0, expiredMsgTtl)
 	if lazyHit {
-		c.lazyHitTotal.Inc()
 		c.doLazyUpdate(msgKey, qCtx, next)
 	}
 	if cachedResp != nil { // cache hit
-		c.hitTotal.Inc()
 		cachedResp.Id = q.Id // change msg id
 		qCtx.SetResponse(cachedResp)
 	}
@@ -315,29 +265,6 @@ func (c *Cache) dumpCache() error {
 	}
 	c.logger.Info("cache dumped", zap.Int("entries", en))
 	return nil
-}
-
-func (c *Cache) Api() *chi.Mux {
-	r := chi.NewRouter()
-	r.Get("/flush", func(w http.ResponseWriter, req *http.Request) {
-		c.backend.Flush()
-	})
-	r.Get("/dump", func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("content-type", "application/octet-stream")
-		_, err := c.writeDump(w)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	})
-	r.Post("/load_dump", func(w http.ResponseWriter, req *http.Request) {
-		if _, err := c.readDump(req.Body); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-	})
-	return r
 }
 
 func (c *Cache) writeDump(w io.Writer) (int, error) {

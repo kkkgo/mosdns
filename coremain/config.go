@@ -27,7 +27,6 @@ type Config struct {
 	Log     mlog.LogConfig `yaml:"log"`
 	Include []string       `yaml:"include"`
 	Plugins []PluginConfig `yaml:"plugins"`
-	API     APIConfig      `yaml:"api"`
 }
 
 // PluginConfig represents a plugin config
@@ -43,8 +42,4 @@ type PluginConfig struct {
 	// The type of Args is depended on RegNewPluginFunc.
 	// If it's a map[string]any, it will be converted by mapstruct.
 	Args any `yaml:"args"`
-}
-
-type APIConfig struct {
-	HTTP string `yaml:"http"`
 }

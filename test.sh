@@ -14,3 +14,4 @@ nslookup test8.dns 127.0.0.1
 nslookup test9.dns 127.0.0.1
 nslookup test0.dns 127.0.0.1
 nslookup ip_rewrite.dns 127.0.0.1
+ls -lah  /usr/bin/mosdns

@@ -22,91 +22,24 @@ package fastforward
 import (
 	"context"
 	"math/rand"
-	"time"
 
 	"github.com/IrineSistiana/mosdns/v5/pkg/upstream"
 	"github.com/miekg/dns"
-	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap/zapcore"
 )
 
 type upstreamWrapper struct {
-	idx             int
-	u               upstream.Upstream
-	cfg             UpstreamConfig
-	queryTotal      prometheus.Counter
-	errTotal        prometheus.Counter
-	thread          prometheus.Gauge
-	responseLatency prometheus.Histogram
-
-	connOpened prometheus.Counter
-	connClosed prometheus.Counter
-}
-
-func (uw *upstreamWrapper) OnEvent(typ upstream.Event) {
-	switch typ {
-	case upstream.EventConnOpen:
-		uw.connOpened.Inc()
-	case upstream.EventConnClose:
-		uw.connClosed.Inc()
-	}
+	idx int
+	u   upstream.Upstream
+	cfg UpstreamConfig
 }
 
 // newWrapper inits all metrics.
 // Note: upstreamWrapper.u still needs to be set.
 func newWrapper(idx int, cfg UpstreamConfig, pluginTag string) *upstreamWrapper {
-	lb := map[string]string{"upstream": cfg.Tag, "tag": pluginTag}
 	return &upstreamWrapper{
 		cfg: cfg,
-		queryTotal: prometheus.NewCounter(prometheus.CounterOpts{
-			Name:        "query_total",
-			Help:        "The total number of queries processed by this upstream",
-			ConstLabels: lb,
-		}),
-		errTotal: prometheus.NewCounter(prometheus.CounterOpts{
-			Name:        "err_total",
-			Help:        "The total number of queries failed",
-			ConstLabels: lb,
-		}),
-		thread: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name:        "thread",
-			Help:        "The number of threads (queries) that are currently being processed",
-			ConstLabels: lb,
-		}),
-		responseLatency: prometheus.NewHistogram(prometheus.HistogramOpts{
-			Name:        "response_latency_millisecond",
-			Help:        "The response latency in millisecond",
-			Buckets:     []float64{1, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000},
-			ConstLabels: lb,
-		}),
-
-		connOpened: prometheus.NewCounter(prometheus.CounterOpts{
-			Name:        "conn_opened_total",
-			Help:        "The total number of connections that are opened",
-			ConstLabels: lb,
-		}),
-		connClosed: prometheus.NewCounter(prometheus.CounterOpts{
-			Name:        "conn_closed_total",
-			Help:        "The total number of connections that are closed",
-			ConstLabels: lb,
-		}),
 	}
-}
-
-func (uw *upstreamWrapper) registerMetricsTo(r prometheus.Registerer) error {
-	for _, collector := range [...]prometheus.Collector{
-		uw.queryTotal,
-		uw.errTotal,
-		uw.thread,
-		uw.responseLatency,
-		uw.connOpened,
-		uw.connClosed,
-	} {
-		if err := r.Register(collector); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // name returns upstream tag if it was set in the config.
@@ -119,18 +52,7 @@ func (uw *upstreamWrapper) name() string {
 }
 
 func (uw *upstreamWrapper) ExchangeContext(ctx context.Context, m *dns.Msg) (*dns.Msg, error) {
-	uw.queryTotal.Inc()
-
-	start := time.Now()
-	uw.thread.Inc()
 	r, err := uw.u.ExchangeContext(ctx, m)
-	uw.thread.Dec()
-
-	if err != nil {
-		uw.errTotal.Inc()
-	} else {
-		uw.responseLatency.Observe(float64(time.Since(start).Milliseconds()))
-	}
 	return r, err
 }
 

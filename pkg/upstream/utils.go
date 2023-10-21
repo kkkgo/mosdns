@@ -22,7 +22,6 @@ package upstream
 import (
 	"fmt"
 	"net"
-	"net/netip"
 	"strconv"
 )
 
@@ -72,21 +71,6 @@ func trySplitHostPort(s string) (string, uint16, error) {
 		return host, port, nil
 	}
 	return s, 0, nil
-}
-
-func parseBootstrapAp(s string) (netip.AddrPort, error) {
-	host, port, err := trySplitHostPort(s)
-	if err != nil {
-		return netip.AddrPort{}, err
-	}
-	if port == 0 {
-		port = 53
-	}
-	addr, err := netip.ParseAddr(host)
-	if err != nil {
-		return netip.AddrPort{}, err
-	}
-	return netip.AddrPortFrom(addr, port), nil
 }
 
 func tryTrimIpv6Brackets(s string) string {
