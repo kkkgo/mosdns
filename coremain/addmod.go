@@ -113,7 +113,7 @@ func genZones(zones []ZoneConfig) (string, string, string) {
 			sequenceText.WriteString(fmt.Sprintf(`        - exec: ttl 0-%d
 `, zone.TTL))
 		}
-		sequenceText.WriteString(fmt.Sprintf(`        - exec: respond from: zone forward ->%s
+		sequenceText.WriteString(fmt.Sprintf(`        - exec: respond [zone forward] ->%s
 `, zone.Zone))
 
 		//gen qname match
