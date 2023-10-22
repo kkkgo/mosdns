@@ -22,12 +22,14 @@ package ip_set
 import (
 	"bytes"
 	"fmt"
+	"net/netip"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/IrineSistiana/mosdns/v5/coremain"
 	"github.com/IrineSistiana/mosdns/v5/pkg/matcher/netlist"
 	"github.com/IrineSistiana/mosdns/v5/plugin/data_provider"
-	"net/netip"
-	"os"
-	"strings"
 )
 
 const PluginType = "ip_set"
@@ -120,6 +122,16 @@ func LoadFromFiles(fs []string, l *netlist.List) error {
 
 func LoadFromFile(f string, l *netlist.List) error {
 	if len(f) > 0 {
+		dir := filepath.Dir(f)
+		err := os.MkdirAll(dir, os.ModePerm)
+		if err != nil {
+			return err
+		}
+		_, err = os.Create(f)
+		if err != nil {
+			return err
+		}
+
 		b, err := os.ReadFile(f)
 		if err != nil {
 			return err
