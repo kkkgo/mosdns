@@ -65,6 +65,10 @@ func (b *IPRewrite) Exec(_ context.Context, qCtx *query_context.Context) error {
 }
 
 func (b *IPRewrite) Response(q *dns.Msg) *dns.Msg {
+	if b == nil {
+		return nil
+	}
+
 	if len(q.Question) != 1 {
 		return nil
 	}
