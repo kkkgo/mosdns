@@ -5,7 +5,7 @@ go 1.21.3
 require (
 	github.com/IrineSistiana/go-bytes-pool v0.0.0-20230918115058-c72bd9761c57
 	github.com/kardianos/service v1.2.2
-	github.com/klauspost/compress v1.17.1
+	github.com/klauspost/compress v1.17.2
 	github.com/miekg/dns v1.1.56
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/oschwald/geoip2-golang v1.9.0
