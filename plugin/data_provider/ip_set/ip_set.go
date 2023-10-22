@@ -122,14 +122,17 @@ func LoadFromFiles(fs []string, l *netlist.List) error {
 
 func LoadFromFile(f string, l *netlist.List) error {
 	if len(f) > 0 {
-		dir := filepath.Dir(f)
-		err := os.MkdirAll(dir, os.ModePerm)
-		if err != nil {
-			return err
-		}
-		_, err = os.Create(f)
-		if err != nil {
-			return err
+		_, err := os.Stat(f)
+		if os.IsNotExist(err) {
+			dir := filepath.Dir(f)
+			err := os.MkdirAll(dir, os.ModePerm)
+			if err != nil {
+				return err
+			}
+			_, err = os.Create(f)
+			if err != nil {
+				return err
+			}
 		}
 
 		b, err := os.ReadFile(f)
