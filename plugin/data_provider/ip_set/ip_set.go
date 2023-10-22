@@ -124,7 +124,7 @@ func LoadFromFile(f string, l *netlist.List) error {
 	if len(f) > 0 {
 		_, err := os.Stat(f)
 		if os.IsNotExist(err) {
-			fmt.Println("[PaoPaoDNS ERROR] cidr_file not found: ", f, err)
+			fmt.Println("[PaoPaoDNS ERROR] cidr_file not found: ", err)
 			dir := filepath.Dir(f)
 			err := os.MkdirAll(dir, os.ModePerm)
 			if err != nil {
