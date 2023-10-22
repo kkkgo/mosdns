@@ -63,7 +63,8 @@ func NewIPSet(bp *coremain.BP, args *Args) (*IPSet, error) {
 
 	l := netlist.NewList()
 	if err := LoadFromIPsAndFiles(args.IPs, args.Files, l); err != nil {
-		return nil, err
+		fmt.Println("[PaoPaoDNS ERROR] cidr_file ERR: ", err)
+		return p, nil
 	}
 	l.Sort()
 	if l.Len() > 0 {
