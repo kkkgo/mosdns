@@ -136,12 +136,12 @@ func genZones(zones []ZoneConfig) (string, string, []string, []int) {
 `, zone.Zone))
 
 		//gen qname match
-		zoneseq := 9
-		if zone.Seq == "top" {
-			zoneseq = 0
-		}
+		zoneseq := 0
 		if zone.Seq == "top6" {
 			zoneseq = 6
+		}
+		if zone.Seq == "list" {
+			zoneseq = 9
 		}
 		orders = append(orders, zoneseq)
 		qnames = append(qnames, fmt.Sprintf(`        - matches: qname domain:%s
