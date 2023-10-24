@@ -14,6 +14,8 @@ type ZoneConfig struct {
 	DNS    string
 	Socks5 string
 	TTL    int
+	Cache  string
+	Seq    string
 }
 
 type SwapsConfig struct {
@@ -51,14 +53,25 @@ func AddMod() {
 	}
 
 	//get yaml config.
-	f, s, q := genZones(config.Zones)
-	i, r := genSwaps(config.Swaps)
-	insertAfterKeyStart("zones_dns_start", f)
-	insertAfterKeyStart("zones_seq_start", s)
-	insertAfterKeyStart("zones_qname_start", q)
-	insertAfterKeyStart("swaps_ipset_start", i)
-	insertAfterKeyStart("swaps_match1_start", r)
-	insertAfterKeyStart("swaps_match2_start", r)
+	dns, seq, qnames, orders := genZones(config.Zones)
+	ipset, rewrite := genSwaps(config.Swaps)
+	insertAfterKeyStart("zones_dns_start", dns)
+	insertAfterKeyStart("zones_seq_start", seq)
+
+	for i, order := range orders {
+		switch order {
+		case 0:
+			insertAfterKeyStart("zones_qname_top_start", qnames[i])
+		case 6:
+			insertAfterKeyStart("zones_qname_top6_start", qnames[i])
+		case 9:
+			insertAfterKeyStart("zones_qname_list_start", qnames[i])
+		}
+	}
+
+	insertAfterKeyStart("swaps_ipset_start", ipset)
+	insertAfterKeyStart("swaps_match1_start", rewrite)
+	insertAfterKeyStart("swaps_match2_start", rewrite)
 	// fmt.Println(allcontent)
 
 	outputFilePath := "/tmp/mosdns_mod.yaml"
@@ -68,10 +81,11 @@ func AddMod() {
 }
 
 // return forward, seq, match
-func genZones(zones []ZoneConfig) (string, string, string) {
+func genZones(zones []ZoneConfig) (string, string, []string, []int) {
 	var forwardText strings.Builder
 	var sequenceText strings.Builder
-	var qnameText strings.Builder
+	var qnames []string
+	var orders []int
 
 	for _, zone := range zones {
 		if zone.DNS == "" {
@@ -113,16 +127,28 @@ func genZones(zones []ZoneConfig) (string, string, string) {
 			sequenceText.WriteString(fmt.Sprintf(`        - exec: ttl 0-%d
 `, zone.TTL))
 		}
+		if zone.Cache == "yes" && (zone.Seq == "top" || zone.Seq == "top6") {
+			sequenceText.WriteString(`        - exec: jump check_cache
+`)
+		}
 		sequenceText.WriteString(fmt.Sprintf(`        - exec: respond [zone forward] -> %s
 `, zone.Zone))
 
 		//gen qname match
-		qnameText.WriteString(fmt.Sprintf(`        - matches: qname domain:%s
+		zoneseq := 9
+		if zone.Seq == "top" {
+			zoneseq = 0
+		}
+		if zone.Seq == "top6" {
+			zoneseq = 6
+		}
+		orders = append(orders, zoneseq)
+		qnames = append(qnames, fmt.Sprintf(`        - matches: qname domain:%s
           exec: goto sequence@%s
 `, zone.Zone, zone.Zone))
 	}
 
-	return forwardText.String(), sequenceText.String(), qnameText.String()
+	return forwardText.String(), sequenceText.String(), qnames, orders
 }
 
 // return ip_set, match
