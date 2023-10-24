@@ -125,12 +125,12 @@ func genZones(zones []ZoneConfig) (string, string, []string, []int) {
 		if zone.Cache == "yes" && (zone.Seq == "top" || zone.Seq == "top6") {
 			sequenceText.WriteString(`        - exec: jump check_cache
 `)
-			sequenceText.WriteString(fmt.Sprintf(`        - exec: $forward_zones@%s
+		}
+		sequenceText.WriteString(fmt.Sprintf(`        - exec: $forward_zones@%s
 `, zone.Zone))
-			if zone.TTL > 0 {
-				sequenceText.WriteString(fmt.Sprintf(`        - exec: ttl 0-%d
+		if zone.TTL > 0 {
+			sequenceText.WriteString(fmt.Sprintf(`        - exec: ttl 0-%d
 `, zone.TTL))
-			}
 		}
 		sequenceText.WriteString(fmt.Sprintf(`        - exec: respond [zone forward] -> %s
 `, zone.Zone))
