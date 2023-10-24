@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -86,7 +87,8 @@ func genZones(zones []ZoneConfig) (string, string, []string, []int) {
 	var sequenceText strings.Builder
 	var qnames []string
 	var orders []int
-
+	socks5AddressRegex := regexp.MustCompile(`^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|\[[:0-9a-fA-F]+\])(:\d{1,5})$`)
+	match := socks5AddressRegex.MatchString(os.Getenv("SOCKS5"))
 	for _, zone := range zones {
 		if zone.DNS == "" {
 			continue
@@ -94,11 +96,10 @@ func genZones(zones []ZoneConfig) (string, string, []string, []int) {
 
 		//gen forward
 		dnsAddresses := strings.Split(zone.DNS, ",")
-
 		var upstreamsText strings.Builder
 		for _, dnsAddress := range dnsAddresses {
 			socks5Option := ""
-			if strings.HasPrefix(dnsAddress, "tcp://") && zone.Socks5 == "yes" {
+			if strings.HasPrefix(dnsAddress, "tcp://") && zone.Socks5 == "yes" && match {
 				if os.Getenv("SOCKS5") != "" {
 					socks5Option = fmt.Sprintf("          socks5: \"%s\"\n", os.Getenv("SOCKS5"))
 				}
