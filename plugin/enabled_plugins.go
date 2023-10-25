@@ -61,7 +61,7 @@ import (
 
 	_ "github.com/IrineSistiana/mosdns/v5/plugin/executable/ip_rewrite"
 
-	_ "github.com/IrineSistiana/mosdns/v5/plugin/executable/cache"
+	// _ "github.com/IrineSistiana/mosdns/v5/plugin/executable/cache"
 
 	// _ "github.com/IrineSistiana/mosdns/v5/plugin/executable/debug_print"
 
