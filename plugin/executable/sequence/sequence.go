@@ -32,7 +32,6 @@ func init() {
 	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(Args) })
 
 	MustRegExecQuickSetup("accept", setupAccept)
-	MustRegExecQuickSetup("respond", setupRespond)
 	MustRegExecQuickSetup("reject", setupReject)
 	MustRegExecQuickSetup("pong", setupPong)
 	MustRegExecQuickSetup("return", setupReturn)

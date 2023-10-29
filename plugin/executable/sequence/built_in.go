@@ -41,48 +41,6 @@ func setupAccept(_ BQ, _ string) (any, error) {
 	return ActionAccept{}, nil
 }
 
-var _ RecursiveExecutable = (*ActionRespond)(nil)
-
-type ActionRespond struct {
-	RespondInfo string
-}
-
-func (a ActionRespond) Exec(_ context.Context, qCtx *query_context.Context, _ ChainWalker) error {
-	if qCtx != nil {
-		r := new(dns.Msg)
-		r.SetReply(qCtx.Q())
-		r.Rcode = 0
-		query_time := "nil"
-		var ttl uint32 = 0
-		query_time = fmt.Sprintf("%dms", time.Since(qCtx.StartTime()).Milliseconds())
-
-		if qCtx.R() != nil && qCtx.R().Answer != nil {
-			r.Answer = qCtx.R().Answer
-			if len(r.Answer) > 0 {
-				ttl = r.Answer[0].Header().Ttl
-			}
-		}
-		txtRecord := new(dns.TXT)
-		txtRecord.Hdr = dns.RR_Header{
-			Name:   time.Now().Format("20060102150405.000") + ".respond.paopaodns.",
-			Rrtype: dns.TypeTXT,
-			Class:  dns.ClassINET,
-			Ttl:    ttl,
-		}
-		txtRecord.Txt = []string{query_time + ", Respond from:" + a.RespondInfo}
-		r.Extra = []dns.RR{txtRecord}
-		qCtx.SetResponse(r)
-	}
-	return nil
-}
-
-func setupRespond(_ BQ, s string) (any, error) {
-	if os.Getenv("ADDINFO") == "yes" {
-		return ActionRespond{RespondInfo: s}, nil
-	}
-	return ActionAccept{}, nil
-}
-
 var _ RecursiveExecutable = (*ActionReject)(nil)
 
 type ActionReject struct{}

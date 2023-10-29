@@ -61,7 +61,7 @@ import (
 
 	_ "github.com/IrineSistiana/mosdns/v5/plugin/executable/ip_rewrite"
 
-	// _ "github.com/IrineSistiana/mosdns/v5/plugin/executable/cache"
+	_ "github.com/IrineSistiana/mosdns/v5/plugin/executable/cache"
 
 	// _ "github.com/IrineSistiana/mosdns/v5/plugin/executable/debug_print"
 
@@ -92,6 +92,8 @@ import (
 
 	// _ "github.com/IrineSistiana/mosdns/v5/plugin/executable/sleep"
 
+	_ "github.com/IrineSistiana/mosdns/v5/plugin/executable/addinfo"
+	_ "github.com/IrineSistiana/mosdns/v5/plugin/executable/shuffle"
 	_ "github.com/IrineSistiana/mosdns/v5/plugin/executable/ttl"
 
 	// other
