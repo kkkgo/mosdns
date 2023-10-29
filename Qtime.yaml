@@ -33,11 +33,11 @@ plugins:
         - matches: "!rcode 0"
           exec: $try_fake
         - matches: has_wanted_ans
-          exec: accept
+          exec: ok
         - exec: query_summary qtime_out
         - exec: $try_chinanet
         - matches: has_wanted_ans
-          exec: accept
+          exec: ok
         - exec: reject 0
 
   - tag: udp_server

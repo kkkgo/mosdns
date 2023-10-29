@@ -131,7 +131,7 @@ func genZones(zones []ZoneConfig) (string, string, []string, []int) {
 			sequenceText.WriteString(fmt.Sprintf(`        - exec: addinfo [zone forward] -> %s
 			`, zone.Zone))
 		}
-		sequenceText.WriteString(`        - exec: accept
+		sequenceText.WriteString(`        - exec: ok
 `)
 
 		//gen qname match

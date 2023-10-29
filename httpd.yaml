@@ -19,7 +19,7 @@ plugins:
         - exec: $try_chinanet
         - exec: ttl 1-3
         - matches: has_wanted_ans
-          exec: accept
+          exec: ok
         - exec: reject 0
         
   - tag: udp_server

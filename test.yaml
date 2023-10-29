@@ -34,7 +34,7 @@ plugins:
     args:
         - exec: $try_404
         - matches: has_wanted_ans
-          exec: accpet
+          exec: ok
         - matches: qname test1.dns
           exec: black_hole 114.114.114.114 2400:3200:baba::1
         - matches: qname test2.dns
@@ -62,10 +62,10 @@ plugins:
         - matches: resp_ip $ip_rewrite
           exec: ip_rewrite cf_ip
         - matches: resp_ip_mmdb $cnip CN
-          exec: accept
+          exec: ok
         - exec: $try_cf
         - matches: has_wanted_ans
-          exec: accept
+          exec: ok
         - exec: pong anyway failed.
 
   - tag: udp_server

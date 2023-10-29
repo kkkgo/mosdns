@@ -26,15 +26,15 @@ plugins:
           exec: reject 0
         - exec: cache 102400
         - matches: has_wanted_ans
-          exec: accept
+          exec: ok
         - exec: $try_local
         - matches: has_wanted_ans
-          exec: accept
+          exec: ok
         - exec: cache 102400
         - exec: $try_chinanet
         - exec: ttl 1-3
         - matches: has_wanted_ans
-          exec: accept
+          exec: ok
         - exec: reject 0
 
   - tag: udp_server
