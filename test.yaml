@@ -62,10 +62,10 @@ plugins:
         - matches: resp_ip $ip_rewrite
           exec: ip_rewrite cf_ip
         - matches: resp_ip_mmdb $cnip CN
-          exec: respond blackhole.
+          exec: accept
         - exec: $try_cf
         - matches: has_wanted_ans
-          exec: respond try_cf
+          exec: accept
         - exec: pong anyway failed.
 
   - tag: udp_server
