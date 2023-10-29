@@ -43,7 +43,7 @@ func (t *addinfo) Exec(_ context.Context, qCtx *query_context.Context) error {
 			Class:  dns.ClassINET,
 			Ttl:    0,
 		}
-		txtRecord.Txt = []string{", Respond from:" + t.txtRecord}
+		txtRecord.Txt = []string{"From:" + t.txtRecord}
 
 		r.Extra = append(r.Extra, txtRecord)
 	}

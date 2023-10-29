@@ -127,8 +127,12 @@ func genZones(zones []ZoneConfig) (string, string, []string, []int) {
 			sequenceText.WriteString(fmt.Sprintf(`        - exec: ttl 0-%d
 `, zone.TTL))
 		}
-		sequenceText.WriteString(fmt.Sprintf(`        - exec: respond [zone forward] -> %s
-`, zone.Zone))
+		if os.Getenv("ADDINFO") == "yes" {
+			sequenceText.WriteString(fmt.Sprintf(`        - exec: addinfo [zone forward] -> %s
+			`, zone.Zone))
+		}
+		sequenceText.WriteString(`        - exec: accept
+`)
 
 		//gen qname match
 		zoneseq := 0
