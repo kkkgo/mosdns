@@ -248,7 +248,7 @@ func (f *Forward) exchange(ctx context.Context, qCtx *query_context.Context, us 
 	qc := qCtx.Q().Copy()
 	uqid := qCtx.Id()
 	for i := 0; i < mcq; i++ {
-		u := randPick(us)
+		u := us[i%len(us)]
 		go func() {
 			// Give each upstream a fixed timeout to finish the query.
 			upstreamCtx, cancel := context.WithTimeout(context.Background(), queryTimeout)
