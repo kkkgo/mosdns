@@ -129,7 +129,7 @@ func genZones(zones []ZoneConfig) (string, string, []string, []int) {
 		}
 		if os.Getenv("ADDINFO") == "yes" {
 			sequenceText.WriteString(fmt.Sprintf(`        - exec: addinfo [zone forward] -> %s
-			`, zone.Zone))
+`, zone.Zone))
 		}
 		sequenceText.WriteString(`        - exec: ok
 `)
