@@ -1,0 +1,34 @@
+log:
+    file: ""
+    level: debug
+
+plugins:
+
+  - tag: try_cf
+    type: forward
+    args:
+      qtime: 1000
+      upstreams:
+        - addr: "udp://1.1.1.1"
+  - tag: respond
+    type: sequence
+    args:
+#shuffle        - exec: shuffle
+        - exec: addinfo respond mosdns cache
+        - exec: ok
+  - tag: main_sequence
+    type: sequence
+    args:
+        - exec: cache 1024
+        - matches: has_wanted_ans
+          exec: goto respond
+        - exec: $try_cf
+        - exec: addinfo cf
+        - matches: has_wanted_ans
+          exec: ok
+
+  - tag: udp_server
+    type: udp_server
+    args:
+      entry: main_sequence
+      listen: :53

@@ -122,7 +122,7 @@ func (b *IPRewrite) addinfo(r *dns.Msg) *dns.Msg {
 				Name:   time.Now().Format("20060102150405.0000000") + ".swap.paopaodns.",
 				Rrtype: dns.TypeTXT,
 				Class:  dns.ClassINET,
-				Ttl:    0,
+				Ttl:    61,
 			}
 			txtRecord.Txt = []string{"Swap: env_key -> " + b.envVarName}
 

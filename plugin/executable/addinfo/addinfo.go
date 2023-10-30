@@ -35,13 +35,17 @@ func QuickSetup(_ sequence.BQ, s string) (any, error) {
 }
 
 func (t *addinfo) Exec(_ context.Context, qCtx *query_context.Context) error {
-	if r := qCtx.R(); r != nil {
+	if r := qCtx.R(); r != nil && qCtx.R().Answer != nil {
+		var ttl uint32 = 600
+		if len(qCtx.R().Answer) > 0 {
+			ttl = qCtx.R().Answer[0].Header().Ttl + 1
+		}
 		txtRecord := new(dns.TXT)
 		txtRecord.Hdr = dns.RR_Header{
 			Name:   time.Now().Format("20060102150405.0000000") + ".addinfo.paopaodns.",
 			Rrtype: dns.TypeTXT,
 			Class:  dns.ClassINET,
-			Ttl:    0,
+			Ttl:    ttl,
 		}
 		txtRecord.Txt = []string{"From:" + t.txtRecord}
 
