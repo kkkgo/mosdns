@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	version = "kkkgo/PaoPaoDNS/20231031"
+	version = "kkkgo/PaoPaoDNS/20231101"
 )
 
 func init() {
