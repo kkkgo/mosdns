@@ -70,8 +70,7 @@ func AddMod() {
 	}
 
 	insertAfterKeyStart("swaps_ipset_start", ipset)
-	insertAfterKeyStart("swaps_match1_start", rewrite)
-	insertAfterKeyStart("swaps_match2_start", rewrite)
+	insertAfterKeyStart("swaps_match_start", rewrite)
 	// fmt.Println(allcontent)
 
 	outputFilePath := "/tmp/mosdns_mod.yaml"
