@@ -55,6 +55,7 @@ func NewIPRewrite(envVarName string) (*IPRewrite, error) {
 			b.ipv6 = append(b.ipv6, addr)
 		}
 	}
+	fmt.Println("[PaoPaoDNS SWAP] load:", envVarName, "=", os.Getenv(envVarName))
 	return b, nil
 }
 
