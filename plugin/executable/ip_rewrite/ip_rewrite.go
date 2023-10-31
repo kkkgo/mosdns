@@ -60,13 +60,13 @@ func NewIPRewrite(envVarName string) (*IPRewrite, error) {
 }
 
 func (b *IPRewrite) Exec(_ context.Context, qCtx *query_context.Context) error {
-	if r := b.Response(qCtx.Q()); r != nil {
+	if r := b.Response(qCtx.Q(), qCtx.R().Answer); r != nil {
 		qCtx.SetResponse(r)
 	}
 	return nil
 }
 
-func (b *IPRewrite) Response(q *dns.Msg) *dns.Msg {
+func (b *IPRewrite) Response(q *dns.Msg, a []dns.RR) *dns.Msg {
 	if b == nil {
 		return nil
 	}
@@ -74,7 +74,10 @@ func (b *IPRewrite) Response(q *dns.Msg) *dns.Msg {
 	if len(q.Question) != 1 {
 		return nil
 	}
-
+	var ttl uint32 = 300
+	if len(a) > 0 {
+		ttl = 60 + a[0].Header().Ttl
+	}
 	qName := q.Question[0].Name
 	qtype := q.Question[0].Qtype
 
@@ -88,7 +91,7 @@ func (b *IPRewrite) Response(q *dns.Msg) *dns.Msg {
 					Name:   qName,
 					Rrtype: dns.TypeA,
 					Class:  dns.ClassINET,
-					Ttl:    60,
+					Ttl:    ttl,
 				},
 				A: addr.AsSlice(),
 			}
@@ -105,7 +108,7 @@ func (b *IPRewrite) Response(q *dns.Msg) *dns.Msg {
 					Name:   qName,
 					Rrtype: dns.TypeAAAA,
 					Class:  dns.ClassINET,
-					Ttl:    60 + q.Answer[0].Header().Ttl,
+					Ttl:    ttl,
 				},
 				AAAA: addr.AsSlice(),
 			}
