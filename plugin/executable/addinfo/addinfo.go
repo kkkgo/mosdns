@@ -3,6 +3,7 @@ package addinfo
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/IrineSistiana/mosdns/v5/pkg/query_context"
@@ -40,6 +41,7 @@ func (t *addinfo) Exec(_ context.Context, qCtx *query_context.Context) error {
 		if len(qCtx.R().Answer) > 0 {
 			ttl = qCtx.R().Answer[0].Header().Ttl + 1
 		}
+		query_time := fmt.Sprintf("Since %dms ", time.Since(qCtx.StartTime()).Milliseconds())
 		txtRecord := new(dns.TXT)
 		txtRecord.Hdr = dns.RR_Header{
 			Name:   time.Now().Format("20060102150405.000000000") + ".addinfo.paopaodns.",
@@ -47,7 +49,7 @@ func (t *addinfo) Exec(_ context.Context, qCtx *query_context.Context) error {
 			Class:  dns.ClassINET,
 			Ttl:    ttl,
 		}
-		txtRecord.Txt = []string{"From:" + t.txtRecord}
+		txtRecord.Txt = []string{query_time + "From:" + t.txtRecord}
 
 		r.Extra = append(r.Extra, txtRecord)
 	}
