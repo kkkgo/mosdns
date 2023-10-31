@@ -6,7 +6,6 @@ import (
 	"net/netip"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/IrineSistiana/mosdns/v5/pkg/query_context"
 	"github.com/IrineSistiana/mosdns/v5/plugin/executable/sequence"
@@ -94,7 +93,7 @@ func (b *IPRewrite) Response(q *dns.Msg) *dns.Msg {
 			}
 			r.Answer = append(r.Answer, rr)
 		}
-		return b.addinfo(r)
+		return r
 
 	case qtype == dns.TypeAAAA && len(b.ipv6) > 0:
 		r := new(dns.Msg)
@@ -111,25 +110,7 @@ func (b *IPRewrite) Response(q *dns.Msg) *dns.Msg {
 			}
 			r.Answer = append(r.Answer, rr)
 		}
-		return b.addinfo(r)
+		return r
 	}
 	return nil
-}
-func (b *IPRewrite) addinfo(r *dns.Msg) *dns.Msg {
-	if os.Getenv("ADDINFO") == "yes" {
-		if r != nil {
-			txtRecord := new(dns.TXT)
-			txtRecord.Hdr = dns.RR_Header{
-				Name:   time.Now().Format("20060102150405.0000000") + ".swap.paopaodns.",
-				Rrtype: dns.TypeTXT,
-				Class:  dns.ClassINET,
-				Ttl:    61,
-			}
-			txtRecord.Txt = []string{"Swap: env_key -> " + b.envVarName}
-
-			r.Extra = append(r.Extra, txtRecord)
-		}
-		return nil
-	}
-	return r
 }
