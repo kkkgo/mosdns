@@ -67,6 +67,8 @@ func (a ActionPong) Exec(_ context.Context, qCtx *query_context.Context, _ Chain
 	r := new(dns.Msg)
 	r.SetReply(qCtx.Q())
 	r.Rcode = 0
+	r.Authoritative = true
+	r.RecursionAvailable = true
 	r.Answer = []dns.RR{}
 	if qCtx != nil {
 		query_time := "nil"
