@@ -108,7 +108,7 @@ func (h *Hosts) LookupMsg(m *dns.Msg) *dns.Msg {
 				Class:  dns.ClassINET,
 				Ttl:    301,
 			}
-			txtRecord.Txt = []string{"USEHOST"}
+			txtRecord.Txt = []string{"USE_HOSTS"}
 			r.Extra = append(r.Extra, txtRecord)
 		}
 	}
