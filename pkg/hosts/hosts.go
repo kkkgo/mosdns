@@ -23,7 +23,9 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/IrineSistiana/mosdns/v5/pkg/matcher/domain"
 	"github.com/miekg/dns"
@@ -74,7 +76,7 @@ func (h *Hosts) LookupMsg(m *dns.Msg) *dns.Msg {
 					Name:   fqdn,
 					Rrtype: dns.TypeA,
 					Class:  dns.ClassINET,
-					Ttl:    10,
+					Ttl:    300,
 				},
 				A: ip.AsSlice(),
 			}
@@ -87,7 +89,7 @@ func (h *Hosts) LookupMsg(m *dns.Msg) *dns.Msg {
 					Name:   fqdn,
 					Rrtype: dns.TypeAAAA,
 					Class:  dns.ClassINET,
-					Ttl:    10,
+					Ttl:    300,
 				},
 				AAAA: ip.AsSlice(),
 			}
@@ -97,6 +99,18 @@ func (h *Hosts) LookupMsg(m *dns.Msg) *dns.Msg {
 
 	if len(r.Answer) == 0 {
 		r.Ns = []dns.RR{}
+	} else {
+		if os.Getenv("ADDINFO") == "yes" && r != nil {
+			txtRecord := new(dns.TXT)
+			txtRecord.Hdr = dns.RR_Header{
+				Name:   time.Now().Format("20060102150405.0000000") + ".host.paopaodns.",
+				Rrtype: dns.TypeTXT,
+				Class:  dns.ClassINET,
+				Ttl:    301,
+			}
+			txtRecord.Txt = []string{"USEHOST"}
+			r.Extra = append(r.Extra, txtRecord)
+		}
 	}
 	return r
 }
