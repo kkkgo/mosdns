@@ -21,11 +21,10 @@ package transport
 
 import (
 	"context"
+	"github.com/miekg/dns"
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/miekg/dns"
 )
 
 // Leak and race tests.

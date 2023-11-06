@@ -1,0 +1,27 @@
+log:
+    file: ""
+    level: debug
+plugins:
+
+  - tag: try_fake
+    type: forward
+    args:
+      qtime: 1000
+      concurrent: 3
+      upstreams:
+        - addr: "udp://10.10.10.4"
+        - addr: "udp://10.10.10.5"
+        - addr: "udp://10.10.10.3"
+  - tag: main_sequence
+    type: sequence
+    args:
+        - exec: $try_fake
+        - matches: has_wanted_ans
+          exec: ok
+        - exec: pong anyway failed.
+
+  - tag: udp_server
+    type: udp_server
+    args:
+      entry: main_sequence
+      listen: :53

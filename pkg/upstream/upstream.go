@@ -21,11 +21,9 @@ package upstream
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net"
-	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
@@ -36,7 +34,6 @@ import (
 	"github.com/IrineSistiana/mosdns/v5/pkg/upstream/transport"
 	"github.com/miekg/dns"
 	"go.uber.org/zap"
-	"golang.org/x/net/proxy"
 )
 
 // Upstream represents a DNS upstream.
@@ -50,17 +47,12 @@ type Upstream interface {
 
 type Opt struct {
 	// DialAddr specifies the address the upstream will
-	// actually dial to in the network layer by overwriting
-	// the address inferred from upstream url.
-	// It won't affect high level layers. (e.g. SNI, HTTP HOST header won't be changed).
-	// Can be an IP or a domain. Port is optional.
-	// Tips: If the upstream url host is a domain, specific an IP address
-	// here can skip resolving ip of this domain.
+	// actually dial to.
 	DialAddr string
 
 	// Socks5 specifies the socks5 proxy server that the upstream
 	// will connect though.
-	// Not implemented for udp based protocols (aka. dns over udp, http3, quic).
+	// Not implemented for udp upstreams and doh upstreams with http/3.
 	Socks5 string
 
 	// SoMark sets the socket SO_MARK option in unix system.
@@ -71,17 +63,17 @@ type Opt struct {
 
 	// IdleTimeout specifies the idle timeout for long-connections.
 	// Available for TCP, DoT, DoH.
-	// Default: TCP, DoT: 10s , DoH, DoQ: 30s.
+	// If negative, TCP, DoT will not reuse connections.
+	// Default: TCP, DoT: 10s , DoH: 30s.
 	IdleTimeout time.Duration
 
 	// EnablePipeline enables query pipelining support as RFC 7766 6.2.1.1 suggested.
 	// Available for TCP, DoT upstream with IdleTimeout >= 0.
-	// Note: There is no fallback.
 	EnablePipeline bool
 
 	// MaxConns limits the total number of connections, including connections
 	// in the dialing states.
-	// Implemented for TCP/DoT pipeline enabled upstream and DoH upstream.
+	// Implemented for TCP/DoT pipeline enabled upstreams and DoH upstreams.
 	// Default is 2.
 	MaxConns int
 
@@ -89,7 +81,7 @@ type Opt struct {
 	Logger *zap.Logger
 
 	// EventObserver can observe connection events.
-	// Not implemented for udp based protocols (dns over udp, http3, quic).
+	// Note: Not Implemented for HTTP/3 upstreams.
 	EventObserver EventObserver
 }
 
@@ -110,10 +102,6 @@ func NewUpstream(addr string, opt Opt) (Upstream, error) {
 		return nil, fmt.Errorf("invalid server address, %w", err)
 	}
 
-	// If host is a ipv6 without port, it will be in []. This will cause err when
-	// split and join address and port. Try to remove brackets now.
-	addrUrlHost := tryTrimIpv6Brackets(addrURL.Host)
-
 	dialer := &net.Dialer{
 		Control: getSocketControlFunc(socketOpts{
 			so_mark:        opt.SoMark,
@@ -121,55 +109,9 @@ func NewUpstream(addr string, opt Opt) (Upstream, error) {
 		}),
 	}
 
-	newTcpDialer := func(dialAddrMustBeIp bool, defaultPort uint16) (func(ctx context.Context) (net.Conn, error), error) {
-		host, port, err := parseDialAddr(addrUrlHost, opt.DialAddr, defaultPort)
-		if err != nil {
-			return nil, err
-		}
-
-		// Socks5 enabled.
-		if s5Addr := opt.Socks5; len(s5Addr) > 0 {
-			socks5Dialer, err := proxy.SOCKS5("tcp", s5Addr, nil, dialer)
-			if err != nil {
-				return nil, fmt.Errorf("failed to init socks5 dialer: %w", err)
-			}
-
-			contextDialer := socks5Dialer.(proxy.ContextDialer)
-			dialAddr := net.JoinHostPort(host, strconv.Itoa(int(port)))
-			return func(ctx context.Context) (net.Conn, error) {
-				return contextDialer.DialContext(ctx, "tcp", dialAddr)
-			}, nil
-		}
-
-		if _, err := netip.ParseAddr(host); err == nil {
-			// Host is an ip addr. No need to resolve it.
-			dialAddr := net.JoinHostPort(host, strconv.Itoa(int(port)))
-			return func(ctx context.Context) (net.Conn, error) {
-				return dialer.DialContext(ctx, "tcp", dialAddr)
-			}, nil
-		} else {
-			if dialAddrMustBeIp {
-				return nil, errors.New("addr must be an ip address")
-			}
-			// Host is not an ip addr, assuming it is a domain.
-			dialAddr := net.JoinHostPort(host, strconv.Itoa(int(port)))
-			return func(ctx context.Context) (net.Conn, error) {
-				return dialer.DialContext(ctx, "tcp", dialAddr)
-			}, nil
-		}
-	}
-
 	switch addrURL.Scheme {
 	case "", "udp":
-		const defaultPort = 53
-		host, port, err := parseDialAddr(addrUrlHost, opt.DialAddr, defaultPort)
-		if err != nil {
-			return nil, err
-		}
-		if _, err := netip.ParseAddr(host); err != nil {
-			return nil, fmt.Errorf("addr must be an ip address, %w", err)
-		}
-		dialAddr := joinPort(host, port)
+		dialAddr := getDialAddrWithPort(addrURL.Host, opt.DialAddr, 53)
 		uto := transport.IOOpts{
 			DialFunc: func(ctx context.Context) (io.ReadWriteCloser, error) {
 				c, err := dialer.DialContext(ctx, "udp", dialAddr)
@@ -196,14 +138,10 @@ func NewUpstream(addr string, opt Opt) (Upstream, error) {
 			t: transport.NewReuseConnTransport(transport.ReuseConnOpts{IOOpts: tto}),
 		}, nil
 	case "tcp":
-		const defaultPort = 53
-		tcpDialer, err := newTcpDialer(true, defaultPort)
-		if err != nil {
-			return nil, fmt.Errorf("failed to init tcp dialer, %w", err)
-		}
+		dialAddr := getDialAddrWithPort(addrURL.Host, opt.DialAddr, 53)
 		to := transport.IOOpts{
 			DialFunc: func(ctx context.Context) (io.ReadWriteCloser, error) {
-				c, err := tcpDialer(ctx)
+				c, err := dialTCP(ctx, dialAddr, opt.Socks5, dialer)
 				c = wrapConn(c, opt.EventObserver)
 				return c, err
 			},
@@ -218,6 +156,26 @@ func NewUpstream(addr string, opt Opt) (Upstream, error) {
 	default:
 		return nil, fmt.Errorf("unsupported protocol [%s]", addrURL.Scheme)
 	}
+}
+
+func getDialAddrWithPort(host, dialAddr string, defaultPort int) string {
+	addr := host
+	if len(dialAddr) > 0 {
+		addr = dialAddr
+	}
+	_, _, err := net.SplitHostPort(addr)
+	if err != nil { // no port, add it.
+		return net.JoinHostPort(strings.Trim(addr, "[]"), strconv.Itoa(defaultPort))
+	}
+	return addr
+}
+
+func tryRemovePort(s string) string {
+	host, _, err := net.SplitHostPort(s)
+	if err != nil {
+		return s
+	}
+	return host
 }
 
 type udpWithFallback struct {

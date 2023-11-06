@@ -6,9 +6,9 @@ plugins:
   - tag: try_local
     type: forward
     args:
-      qtime: 10
+      qtime: 1000
       upstreams:
-        - addr: "udp://10.10.10.7"
+        - addr: "udp://10.10.10.17"
 
   - tag: try_chinanet
     type: forward

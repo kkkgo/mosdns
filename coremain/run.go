@@ -21,16 +21,16 @@ package coremain
 
 import (
 	"fmt"
-	"github.com/IrineSistiana/mosdns/v5/mlog"
-	"github.com/kardianos/service"
-	"github.com/mitchellh/mapstructure"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"go.uber.org/zap"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
+
+	"github.com/IrineSistiana/mosdns/v5/mlog"
+	"github.com/mitchellh/mapstructure"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"go.uber.org/zap"
 )
 
 type serverFlags struct {
@@ -50,13 +50,6 @@ func init() {
 		Use:   "start [-c config_file] [-d working_dir]",
 		Short: "Start mosdns main program.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if sf.asService {
-				svc, err := service.New(&serverService{f: sf}, svcCfg)
-				if err != nil {
-					return fmt.Errorf("failed to init service, %w", err)
-				}
-				return svc.Run()
-			}
 
 			m, err := NewServer(sf)
 			if err != nil {
@@ -87,15 +80,6 @@ func init() {
 		Use:   "service",
 		Short: "Manage mosdns as a system service.",
 	}
-	serviceCmd.PersistentPreRunE = initService
-	serviceCmd.AddCommand(
-		newSvcInstallCmd(),
-		newSvcUninstallCmd(),
-		newSvcStartCmd(),
-		newSvcStopCmd(),
-		newSvcRestartCmd(),
-		newSvcStatusCmd(),
-	)
 	rootCmd.AddCommand(serviceCmd)
 }
 

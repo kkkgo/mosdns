@@ -22,6 +22,9 @@ package transport
 import (
 	"context"
 	"errors"
+	"github.com/IrineSistiana/mosdns/v5/pkg/dnsutils"
+	"github.com/IrineSistiana/mosdns/v5/pkg/pool"
+	"github.com/miekg/dns"
 	"io"
 	"math/rand"
 	"net"
@@ -29,10 +32,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/IrineSistiana/mosdns/v5/pkg/dnsutils"
-	"github.com/IrineSistiana/mosdns/v5/pkg/pool"
-	"github.com/miekg/dns"
 )
 
 var (
@@ -41,13 +40,13 @@ var (
 		c1, c2 := net.Pipe()
 		go func() {
 			for {
-				m, readErr := dnsutils.ReadRawMsgFromTCP(c2)
+				m, _, readErr := dnsutils.ReadRawMsgFromTCP(c2)
 				if m != nil {
 					go func() {
 						defer pool.ReleaseBuf(m)
 						latency := time.Millisecond * time.Duration(rand.Intn(20))
 						time.Sleep(latency)
-						_, _ = dnsutils.WriteRawMsgToTCP(c2, *m)
+						_, _ = dnsutils.WriteRawMsgToTCP(c2, m)
 					}()
 				}
 				if readErr != nil {

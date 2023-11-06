@@ -54,7 +54,6 @@ type Args struct {
 	Upstreams  []UpstreamConfig `yaml:"upstreams"`
 	Concurrent int              `yaml:"concurrent"`
 	QTime      int              `yaml:"qtime"`
-
 	// Global options.
 	Socks5       string `yaml:"socks5"`
 	SoMark       int    `yaml:"so_mark"`
@@ -62,13 +61,12 @@ type Args struct {
 }
 
 type UpstreamConfig struct {
-	Tag                string `yaml:"tag"`
-	Addr               string `yaml:"addr"` // Required.
-	DialAddr           string `yaml:"dial_addr"`
-	IdleTimeout        int    `yaml:"idle_timeout"`
-	MaxConns           int    `yaml:"max_conns"`
-	EnablePipeline     bool   `yaml:"enable_pipeline"`
-	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
+	Tag            string `yaml:"tag"`
+	Addr           string `yaml:"addr"` // Required.
+	DialAddr       string `yaml:"dial_addr"`
+	IdleTimeout    int    `yaml:"idle_timeout"`
+	MaxConns       int    `yaml:"max_conns"`
+	EnablePipeline bool   `yaml:"enable_pipeline"`
 
 	Socks5       string `yaml:"socks5"`
 	SoMark       int    `yaml:"so_mark"`
@@ -80,16 +78,13 @@ func getDefaultQueryTimeout() time.Duration {
 	if QUERY_TIME == "" {
 		return time.Second * 3
 	}
-
 	duration, err := time.ParseDuration(QUERY_TIME)
 	if err != nil {
 		fmt.Printf("Failed to parse QUERY_TIME value: %v\n", err)
 		return time.Second * 3
 	}
-
 	return duration
 }
-
 func Init(bp *coremain.BP, args any) (any, error) {
 	f, err := NewForward(args.(*Args), Opts{Logger: bp.L(), MetricsTag: bp.Tag()})
 	if err != nil {
@@ -105,7 +100,7 @@ type Forward struct {
 	args *Args
 
 	logger       *zap.Logger
-	us           []*upstreamWrapper
+	us           map[*upstreamWrapper]struct{}
 	tag2Upstream map[string]*upstreamWrapper // for fast tag lookup only.
 }
 
@@ -127,6 +122,7 @@ func NewForward(args *Args, opt Opts) (*Forward, error) {
 	f := &Forward{
 		args:         args,
 		logger:       opt.Logger,
+		us:           make(map[*upstreamWrapper]struct{}),
 		tag2Upstream: make(map[string]*upstreamWrapper),
 	}
 
@@ -142,7 +138,7 @@ func NewForward(args *Args, opt Opts) (*Forward, error) {
 		}
 		applyGlobal(&c)
 
-		uw := newWrapper(i, c, opt.MetricsTag)
+		uw := newWrapper(c, opt.MetricsTag)
 		uOpt := upstream.Opt{
 			DialAddr:       c.DialAddr,
 			Socks5:         c.Socks5,
@@ -160,7 +156,7 @@ func NewForward(args *Args, opt Opts) (*Forward, error) {
 			return nil, fmt.Errorf("failed to init upstream #%d: %w", i, err)
 		}
 		uw.u = u
-		f.us = append(f.us, uw)
+		f.us[uw] = struct{}{}
 
 		if len(c.Tag) > 0 {
 			if _, dup := f.tag2Upstream[c.Tag]; dup {
@@ -185,16 +181,17 @@ func (f *Forward) Exec(ctx context.Context, qCtx *query_context.Context) (err er
 
 // QuickConfigureExec format: [upstream_tag]...
 func (f *Forward) QuickConfigureExec(args string) (any, error) {
-	var us []*upstreamWrapper
+	var us map[*upstreamWrapper]struct{}
 	if len(args) == 0 { // No args, use all upstreams.
 		us = f.us
 	} else { // Pick up upstreams by tags.
+		us = make(map[*upstreamWrapper]struct{})
 		for _, tag := range strings.Fields(args) {
 			u := f.tag2Upstream[tag]
 			if u == nil {
 				return nil, fmt.Errorf("cannot find upstream by tag %s", tag)
 			}
-			us = append(us, u)
+			us[u] = struct{}{}
 		}
 	}
 	var execFunc sequence.ExecutableFunc = func(ctx context.Context, qCtx *query_context.Context) error {
@@ -209,27 +206,23 @@ func (f *Forward) QuickConfigureExec(args string) (any, error) {
 }
 
 func (f *Forward) Close() error {
-	for _, u := range f.us {
-		_ = u.Close()
+	for u := range f.us {
+		_ = (*u).Close()
 	}
 	return nil
 }
 
-func (f *Forward) exchange(ctx context.Context, qCtx *query_context.Context, us []*upstreamWrapper) (*dns.Msg, error) {
+func (f *Forward) exchange(ctx context.Context, qCtx *query_context.Context, us map[*upstreamWrapper]struct{}) (*dns.Msg, error) {
 	if len(us) == 0 {
 		return nil, errors.New("no upstream to exchange")
 	}
 	queryTimeout := defaultQueryTimeout
-
 	if f.args.QTime > 0 {
 		queryTimeout = time.Duration(f.args.QTime) * time.Millisecond
 	}
 	mcq := f.args.Concurrent
 	if mcq <= 0 {
 		mcq = 1
-	}
-	if mcq > len(us) {
-		mcq = len(us)
 	}
 	if mcq > maxConcurrentQueries {
 		mcq = maxConcurrentQueries
@@ -247,10 +240,16 @@ func (f *Forward) exchange(ctx context.Context, qCtx *query_context.Context, us 
 
 	qc := qCtx.Q().Copy()
 	uqid := qCtx.Id()
-	for i := 0; i < mcq; i++ {
-		u := us[i]
+	sent := 0
+	for u := range us {
+		if sent > mcq {
+			break
+		}
+		sent++
+
+		u := u
 		go func() {
-			// Give each upstream a fixed timeout to finish the query.
+			// Give each upstream a fixed timeout to finsh the query.
 			upstreamCtx, cancel := context.WithTimeout(context.Background(), queryTimeout)
 			defer cancel()
 			r, err := u.ExchangeContext(upstreamCtx, qc)
@@ -270,24 +269,25 @@ func (f *Forward) exchange(ctx context.Context, qCtx *query_context.Context, us 
 		}()
 	}
 
-	for i := 0; i < mcq; i++ {
+	es := new(utils.Errors)
+	for i := 0; i < sent; i++ {
 		select {
 		case res := <-resChan:
-			r, err := res.r, res.err
+			r, u, err := res.r, res.u, res.err
 			if err != nil {
-				continue
-			}
-
-			// Retry until the last
-			if i < mcq-1 && r.Rcode != dns.RcodeSuccess && r.Rcode != dns.RcodeNameError {
+				es.Append(&upstreamErr{
+					upstreamName: u.name(),
+					err:          err,
+				})
 				continue
 			}
 			return r, nil
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			es.Append(fmt.Errorf("exchange: %w", ctx.Err()))
+			return nil, es
 		}
 	}
-	return nil, errors.New("all upstream servers failed")
+	return nil, es
 }
 
 func quickSetup(bq sequence.BQ, s string) (any, error) {

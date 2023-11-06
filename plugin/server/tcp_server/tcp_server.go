@@ -69,14 +69,17 @@ func StartServer(bp *coremain.BP, args *Args) (*TcpServer, error) {
 		return nil, fmt.Errorf("failed to init dns handler, %w", err)
 	}
 
+	serverOpts := server.TCPServerOpts{Logger: bp.L(), DNSHandler: dh, IdleTimeout: time.Duration(args.IdleTimeout) * time.Second}
+	s := server.NewTCPServer(serverOpts)
+
 	l, err := net.Listen("tcp", args.Listen)
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen socket, %w", err)
 	}
+
 	go func() {
 		defer l.Close()
-		serverOpts := server.TCPServerOpts{Logger: bp.L(), IdleTimeout: time.Duration(args.IdleTimeout) * time.Second}
-		err := server.ServeTCP(l, dh, serverOpts)
+		err := s.ServeTCP(l)
 		bp.M().GetSafeClose().SendCloseSignal(err)
 	}()
 	return &TcpServer{

@@ -22,13 +22,15 @@ package server
 import (
 	"context"
 	"fmt"
-	"net"
-	"net/netip"
-	"time"
-
+	"github.com/IrineSistiana/mosdns/v5/mlog"
 	"github.com/IrineSistiana/mosdns/v5/pkg/dnsutils"
 	"github.com/IrineSistiana/mosdns/v5/pkg/pool"
+	"github.com/IrineSistiana/mosdns/v5/pkg/query_context"
+	"github.com/IrineSistiana/mosdns/v5/pkg/server/dns_handler"
+	"github.com/IrineSistiana/mosdns/v5/pkg/utils"
 	"go.uber.org/zap"
+	"net"
+	"time"
 )
 
 const (
@@ -36,30 +38,33 @@ const (
 	tcpFirstReadTimeout   = time.Millisecond * 500
 )
 
-type TCPServerOpts struct {
-	// Nil logger == nop
-	Logger *zap.Logger
+type TCPServer struct {
+	opts TCPServerOpts
+}
 
-	// Default is defaultTCPIdleTimeout.
+func NewTCPServer(opts TCPServerOpts) *TCPServer {
+	opts.init()
+	return &TCPServer{opts: opts}
+}
+
+type TCPServerOpts struct {
+	DNSHandler  dns_handler.Handler // Required.
+	Logger      *zap.Logger
 	IdleTimeout time.Duration
+}
+
+func (opts *TCPServerOpts) init() {
+	if opts.Logger == nil {
+		opts.Logger = mlog.Nop()
+	}
+	utils.SetDefaultNum(&opts.IdleTimeout, defaultTCPIdleTimeout)
+	return
 }
 
 // ServeTCP starts a server at l. It returns if l had an Accept() error.
 // It always returns a non-nil error.
-func ServeTCP(l net.Listener, h Handler, opts TCPServerOpts) error {
-	logger := opts.Logger
-	if logger == nil {
-		logger = nopLogger
-	}
-	idleTimeout := opts.IdleTimeout
-	if idleTimeout <= 0 {
-		idleTimeout = defaultTCPIdleTimeout
-	}
-	firstReadTimeout := tcpFirstReadTimeout
-	if idleTimeout < firstReadTimeout {
-		firstReadTimeout = idleTimeout
-	}
-
+func (s *TCPServer) ServeTCP(l net.Listener) error {
+	// handle listener
 	listenerCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	for {
@@ -74,11 +79,13 @@ func ServeTCP(l net.Listener, h Handler, opts TCPServerOpts) error {
 			defer c.Close()
 			defer cancelConn()
 
-			var clientAddr netip.Addr
-			ta, ok := c.RemoteAddr().(*net.TCPAddr)
-			if ok {
-				clientAddr = ta.AddrPort().Addr()
+			firstReadTimeout := tcpFirstReadTimeout
+			idleTimeout := s.opts.IdleTimeout
+			if idleTimeout < firstReadTimeout {
+				firstReadTimeout = idleTimeout
 			}
+
+			clientAddr := utils.GetAddrFromAddr(c.RemoteAddr())
 
 			firstRead := true
 			for {
@@ -95,15 +102,24 @@ func ServeTCP(l net.Listener, h Handler, opts TCPServerOpts) error {
 
 				// handle query
 				go func() {
-					r := h.Handle(tcpConnCtx, req, QueryMeta{ClientAddr: clientAddr}, pool.PackTCPBuffer)
-					if r == nil {
-						c.Close() // abort the connection
+					qCtx := query_context.NewContext(req)
+					query_context.SetClientAddr(qCtx, &clientAddr)
+					if err := s.opts.DNSHandler.ServeDNS(tcpConnCtx, qCtx); err != nil {
+						s.opts.Logger.Warn("handler err", zap.Error(err))
+						c.Close()
 						return
 					}
-					defer pool.ReleaseBuf(r)
+					r := qCtx.R()
 
-					if _, err := c.Write(*r); err != nil {
-						logger.Warn("failed to write response", zap.Stringer("client", c.RemoteAddr()), zap.Error(err))
+					b, buf, err := pool.PackBuffer(r)
+					if err != nil {
+						s.opts.Logger.Error("failed to unpack handler's response", zap.Error(err), zap.Stringer("msg", r))
+						return
+					}
+					defer pool.ReleaseBuf(buf)
+
+					if _, err := dnsutils.WriteRawMsgToTCP(c, b); err != nil {
+						s.opts.Logger.Warn("failed to write response", zap.Stringer("client", c.RemoteAddr()), zap.Error(err))
 						return
 					}
 				}()

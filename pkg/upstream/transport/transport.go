@@ -22,10 +22,9 @@ package transport
 import (
 	"context"
 	"errors"
+	"github.com/miekg/dns"
 	"io"
 	"time"
-
-	"github.com/miekg/dns"
 )
 
 var (

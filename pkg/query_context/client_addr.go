@@ -17,22 +17,22 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package pool
+package query_context
 
 import (
-	"github.com/miekg/dns"
-	"testing"
+	"net/netip"
 )
 
-func TestPackBuffer_No_Allocation(t *testing.T) {
-	m := new(dns.Msg)
-	m.SetQuestion("123.", dns.TypeAAAA)
-	wire, buf, err := PackBuffer(m)
-	if err != nil {
-		t.Fatal(err)
-	}
+var clientAddrKey = RegKey()
 
-	if cap(wire) != cap(buf) {
-		t.Fatalf("wire and buf have different cap, wire %d, buf %d", cap(wire), cap(buf))
+func SetClientAddr(qCtx *Context, addr *netip.Addr) {
+	qCtx.StoreValue(clientAddrKey, addr)
+}
+
+func GetClientAddr(qCtx *Context) (*netip.Addr, bool) {
+	v, ok := qCtx.GetValue(clientAddrKey)
+	if !ok {
+		return nil, false
 	}
+	return v.(*netip.Addr), true
 }

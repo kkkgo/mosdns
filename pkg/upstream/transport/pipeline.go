@@ -21,11 +21,10 @@ package transport
 
 import (
 	"context"
+	"github.com/miekg/dns"
 	"math/rand"
 	"sync"
 	"time"
-
-	"github.com/miekg/dns"
 )
 
 // PipelineTransport will pipeline queries as RFC 7766 6.2.1.1 suggested.
@@ -33,11 +32,10 @@ import (
 type PipelineTransport struct {
 	PipelineOpts
 
-	m           sync.Mutex // protect following fields
-	closed      bool
-	r           *rand.Rand
-	activeConns []*pipelineConn
-	conns       map[*pipelineConn]struct{}
+	m      sync.Mutex // protect following fields
+	closed bool
+	r      *rand.Rand
+	conns  []*pipelineConn
 }
 
 type PipelineOpts struct {
@@ -67,7 +65,6 @@ func NewPipelineTransport(opt PipelineOpts) *PipelineTransport {
 	return &PipelineTransport{
 		PipelineOpts: opt,
 		r:            rand.New(rand.NewSource(time.Now().Unix())),
-		conns:        make(map[*pipelineConn]struct{}),
 	}
 }
 
@@ -75,13 +72,13 @@ func (t *PipelineTransport) ExchangeContext(ctx context.Context, m *dns.Msg) (*d
 	const maxAttempt = 3
 	attempt := 0
 	for {
-		pc, allocatedQid, isNewConn, err := t.getPipelineConn()
+		conn, allocatedQid, isNewConn, wg, err := t.getPipelineConn()
 		if err != nil {
 			return nil, err
 		}
 
-		r, err := pc.dc.exchangePipeline(ctx, m, allocatedQid)
-		pc.wg.Done()
+		r, err := conn.exchangePipeline(ctx, m, allocatedQid)
+		wg.Done()
 
 		if err != nil {
 			// Reused connection may not stable.
@@ -105,7 +102,7 @@ func (t *PipelineTransport) Close() error {
 		return nil
 	}
 	t.closed = true
-	for conn := range t.conns {
+	for _, conn := range t.conns {
 		conn.dc.closeWithErr(errClosedTransport)
 	}
 	return nil
@@ -115,9 +112,10 @@ func (t *PipelineTransport) Close() error {
 // Caller must call wg.Done() after dnsConn.exchangePipeline.
 // The returned dnsConn is ready to serve queries.
 func (t *PipelineTransport) getPipelineConn() (
-	pc *pipelineConn,
+	dc *dnsConn,
 	allocatedQid uint16,
 	isNewConn bool,
+	wg *sync.WaitGroup,
 	err error,
 ) {
 	t.m.Lock()
@@ -129,19 +127,21 @@ func (t *PipelineTransport) getPipelineConn() (
 
 	pci, pc := t.pickPipelineConnLocked()
 
-	// Dial a new connection if (conn pool is empty), or
-	// (the picked conn is busy, and we are allowed to dial more connections).
+	// Dail a new connection if (conn pool is empty), or
+	// (the picked conn is busy, and we are allowed to dail more connections).
 	maxConn := t.MaxConn
 	if maxConn <= 0 {
 		maxConn = defaultPipelineMaxConns
 	}
-	if pc == nil || (pc.dc.queueLen() > pipelineBusyQueueLen && len(t.activeConns) < maxConn) {
-		dc := newDnsConn(t.IOOpts)
+	if pc == nil || (pc.dc.queueLen() > pipelineBusyQueueLen && len(t.conns) < maxConn) {
+		dc = newDnsConn(t.IOOpts)
 		pc = newPipelineConn(dc)
 		isNewConn = true
-		pci = sliceAdd(&t.activeConns, pc)
-		t.conns[pc] = struct{}{}
+		pci = sliceAdd(&t.conns, pc)
+	} else {
+		dc = pc.dc
 	}
+	wg = &pc.wg
 
 	pc.wg.Add(1)
 	pc.servedLocked++
@@ -151,20 +151,13 @@ func (t *PipelineTransport) getPipelineConn() (
 		// This connection has served too many queries.
 		// Note: the connection should be closed only after all its queries finished.
 		// We can't close it here. Some queries may still on that connection.
-		sliceDel(&t.activeConns, pci) // remove from active conns
-	}
-	t.m.Unlock()
-
-	if eol {
-		// Cleanup when all queries is finished.
+		sliceDel(&t.conns, pci)
 		go func() {
-			pc.wg.Wait()
-			pc.dc.closeWithErr(errEOL)
-			t.m.Lock()
-			delete(t.conns, pc)
-			t.m.Unlock()
+			wg.Wait()
+			dc.closeWithErr(errEOL)
 		}()
 	}
+	t.m.Unlock()
 	return
 }
 
@@ -173,10 +166,9 @@ func (t *PipelineTransport) getPipelineConn() (
 // Require holding PipelineTransport.m.
 func (t *PipelineTransport) pickPipelineConnLocked() (int, *pipelineConn) {
 	for {
-		pci, pc := sliceRandGet(t.activeConns, t.r)
+		pci, pc := sliceRandGet(t.conns, t.r)
 		if pc != nil && pc.dc.isClosed() { // closed conn, delete it and retry
-			sliceDel(&t.activeConns, pci)
-			delete(t.conns, pc)
+			sliceDel(&t.conns, pci)
 			continue
 		}
 		return pci, pc // conn pool is empty or we got a pc

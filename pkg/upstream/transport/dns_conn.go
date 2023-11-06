@@ -22,11 +22,10 @@ package transport
 import (
 	"context"
 	"fmt"
+	"github.com/miekg/dns"
 	"io"
 	"sync"
 	"sync/atomic"
-
-	"github.com/miekg/dns"
 )
 
 // dnsConn is a low-level connection for dns.

@@ -1,0 +1,31 @@
+log:
+    file: ""
+    level: debug
+
+plugins:
+  - tag: "ip_set@lux"
+    type: "ip_set"
+    args:
+     ips:
+       - "104.1.1.1"
+  - tag: try_cf
+    type: forward
+    args:
+      qtime: 1000
+      upstreams:
+        - addr: "udp://1.1.1.1"
+  - tag: main_sequence
+    type: sequence
+    args:
+        - exec: $try_cf
+        - matches: resp_ip $ip_set@lux
+          exec: ip_rewrite cf_ip
+        - matches: has_wanted_ans
+          exec: ok
+        - exec: pong anyway failed.
+
+  - tag: udp_server
+    type: udp_server
+    args:
+      entry: main_sequence
+      listen: :53

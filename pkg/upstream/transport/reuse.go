@@ -21,9 +21,8 @@ package transport
 
 import (
 	"context"
-	"sync"
-
 	"github.com/miekg/dns"
+	"sync"
 )
 
 type ReuseConnTransport struct {

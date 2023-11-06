@@ -37,7 +37,7 @@ type EventObserver interface {
 
 type nopEO struct{}
 
-func (n nopEO) OnEvent(_ Event) {}
+func (n nopEO) OnEvent(_ Event) { return }
 
 type connWrapper struct {
 	net.Conn

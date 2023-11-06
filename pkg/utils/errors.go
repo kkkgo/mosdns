@@ -17,22 +17,47 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package pool
+package utils
 
 import (
-	"github.com/miekg/dns"
-	"testing"
+	"strings"
+	"sync"
 )
 
-func TestPackBuffer_No_Allocation(t *testing.T) {
-	m := new(dns.Msg)
-	m.SetQuestion("123.", dns.TypeAAAA)
-	wire, buf, err := PackBuffer(m)
-	if err != nil {
-		t.Fatal(err)
+type Errors struct {
+	sync.RWMutex
+	es []error
+}
+
+func (c *Errors) Error() string {
+	c.Lock()
+	defer c.Unlock()
+
+	switch len(c.es) {
+	case 0:
+		return ""
+	case 1:
+		return c.es[0].Error()
 	}
 
-	if cap(wire) != cap(buf) {
-		t.Fatalf("wire and buf have different cap, wire %d, buf %d", cap(wire), cap(buf))
+	b := new(strings.Builder)
+	b.WriteString("multi errors:")
+	b.WriteString(c.es[0].Error())
+	for _, e := range c.es[1:] {
+		b.WriteString(", ")
+		b.WriteString(e.Error())
 	}
+	return b.String()
+}
+
+func (c *Errors) Append(err error) {
+	c.Lock()
+	defer c.Unlock()
+	c.es = append(c.es, err)
+}
+
+func (c *Errors) Len() int {
+	c.Lock()
+	defer c.Unlock()
+	return len(c.es)
 }

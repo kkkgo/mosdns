@@ -21,6 +21,7 @@ package fastforward
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/IrineSistiana/mosdns/v5/pkg/upstream"
 	"github.com/miekg/dns"
@@ -28,14 +29,13 @@ import (
 )
 
 type upstreamWrapper struct {
-	idx int
 	u   upstream.Upstream
 	cfg UpstreamConfig
 }
 
 // newWrapper inits all metrics.
 // Note: upstreamWrapper.u still needs to be set.
-func newWrapper(idx int, cfg UpstreamConfig, pluginTag string) *upstreamWrapper {
+func newWrapper(cfg UpstreamConfig, pluginTag string) *upstreamWrapper {
 	return &upstreamWrapper{
 		cfg: cfg,
 	}
@@ -71,4 +71,17 @@ func (q *queryInfo) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
 		encoder.AddUint16("qclass", question.Qclass)
 	}
 	return nil
+}
+
+type upstreamErr struct {
+	upstreamName string
+	err          error
+}
+
+func (u *upstreamErr) Unwrap() error {
+	return u.err
+}
+
+func (u *upstreamErr) Error() string {
+	return fmt.Sprintf("upstream %s: %s", u.upstreamName, u.err)
 }

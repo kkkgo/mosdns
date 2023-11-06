@@ -23,6 +23,6 @@ package server
 
 import "net"
 
-func initOobHandler(c *net.UDPConn) (getSrcAddrFromOOB, writeSrcAddrToOOB, error) {
-	return nil, nil, nil
+func newCmc(c *net.UDPConn) (cmcUDPConn, error) {
+	return newDummyCmc(c), nil
 }
