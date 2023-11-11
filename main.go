@@ -47,6 +47,13 @@ func init() {
 			coremain.AddMod()
 		},
 	})
+	coremain.AddSubCmd(&cobra.Command{
+		Use:   "curl",
+		Short: "Curl url filename[s] socks[no]",
+		Run: func(cmd *cobra.Command, args []string) {
+			coremain.Curl(args)
+		},
+	})
 }
 
 func main() {
