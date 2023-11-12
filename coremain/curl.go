@@ -71,7 +71,7 @@ func Curl(args []string) {
 		os.Exit(1)
 	}
 
-	req.Header.Set("User-Agent", "https://github.com/kkkgo/PaoPaoDNS")
+	req.Header.Set("User-Agent", "Mozilla/5.0 Gecko/20100101 Firefox/120.0 https://github.com/kkkgo/PaoPaoDNS")
 
 	resp, err := client.Do(req)
 	if err != nil {
