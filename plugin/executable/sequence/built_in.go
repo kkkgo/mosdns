@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/IrineSistiana/mosdns/v5/pkg/query_context"
@@ -43,18 +44,28 @@ func setupAccept(_ BQ, _ string) (any, error) {
 
 var _ RecursiveExecutable = (*ActionReject)(nil)
 
-type ActionReject struct{}
+type ActionReject struct {
+	Rcode int
+}
 
 func (a ActionReject) Exec(_ context.Context, qCtx *query_context.Context, _ ChainWalker) error {
 	r := new(dns.Msg)
 	r.SetReply(qCtx.Q())
-	r.Rcode = 0
+	r.Rcode = a.Rcode
 	qCtx.SetResponse(r)
 	return nil
 }
 
 func setupReject(_ BQ, s string) (any, error) {
-	return ActionReject{}, nil
+	rcode := 0
+	if len(s) > 0 {
+		n, err := strconv.Atoi(s)
+		if err != nil || n < 0 || n > 0xFFF {
+			return nil, fmt.Errorf("invalid rcode [%s]", s)
+		}
+		rcode = n
+	}
+	return ActionReject{Rcode: rcode}, nil
 }
 
 var _ RecursiveExecutable = (*ActionPong)(nil)
