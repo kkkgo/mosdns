@@ -67,7 +67,7 @@ func Curl(args []string) {
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		fmt.Println("Error creating HTTP request:", err)
+		fmt.Println("Error creating HTTP request")
 		os.Exit(1)
 	}
 
@@ -75,7 +75,7 @@ func Curl(args []string) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println("Error connecting to the server:", err)
+		fmt.Println("Error connecting to the server")
 		os.Exit(1)
 	}
 	defer resp.Body.Close()
