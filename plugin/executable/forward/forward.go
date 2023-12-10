@@ -281,7 +281,11 @@ func (f *Forward) exchange(ctx context.Context, qCtx *query_context.Context, us 
 				})
 				continue
 			}
-			return r, nil
+			for _, ans := range r.Answer {
+				if ans.Header().Rrtype == qc.Question[0].Qtype {
+					return r, nil
+				}
+			}
 		case <-ctx.Done():
 			es.Append(fmt.Errorf("exchange: %w", ctx.Err()))
 			return nil, es
