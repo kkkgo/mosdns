@@ -55,7 +55,7 @@ func Curl(args []string) {
 				}
 
 				return (&net.Dialer{
-					Timeout:   10 * time.Second,
+					Timeout:   3 * time.Second,
 					DualStack: false,
 				}).Dial(network, addr)
 			},
