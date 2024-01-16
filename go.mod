@@ -1,6 +1,6 @@
 module github.com/IrineSistiana/mosdns/v5
 
-go 1.21.5
+go 1.21.6
 
 require (
 	github.com/miekg/dns v1.1.57
@@ -9,7 +9,7 @@ require (
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
 	go.uber.org/zap v1.26.0
-	golang.org/x/exp v0.0.0-20240103183307-be819d1f06fc
+	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3
 	golang.org/x/net v0.20.0
 	golang.org/x/sync v0.6.0
 	golang.org/x/sys v0.16.0
@@ -33,7 +33,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	golang.org/x/tools v0.16.1 // indirect
+	golang.org/x/tools v0.17.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
