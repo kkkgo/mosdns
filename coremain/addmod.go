@@ -111,6 +111,7 @@ func genZones(zones []ZoneConfig) (string, string, []string, []int) {
     type: forward
     args:
       concurrent: 3
+      allowcode: 23
       upstreams:
 %s`, zone.Zone, upstreamsText.String()))
 
