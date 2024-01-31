@@ -15,7 +15,7 @@ jobs:
   dep-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout
       - name: build test
         run: docker build -t dep .
       - name: update dep
