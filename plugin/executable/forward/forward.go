@@ -54,6 +54,7 @@ type Args struct {
 	Upstreams  []UpstreamConfig `yaml:"upstreams"`
 	Concurrent int              `yaml:"concurrent"`
 	QTime      int              `yaml:"qtime"`
+	Allowcode  int              `yaml:"allowcode"`
 	// Global options.
 	Socks5       string `yaml:"socks5"`
 	SoMark       int    `yaml:"so_mark"`
@@ -281,7 +282,7 @@ func (f *Forward) exchange(ctx context.Context, qCtx *query_context.Context, us 
 				})
 				continue
 			}
-			if r.Rcode == dns.RcodeSuccess {
+			if r.Rcode <= f.args.Allowcode {
 				return r, nil
 			}
 		case <-ctx.Done():
