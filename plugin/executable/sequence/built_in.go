@@ -72,12 +72,17 @@ var _ RecursiveExecutable = (*ActionPong)(nil)
 
 type ActionPong struct {
 	DebugInfo string
+	AllowErr  bool
 }
 
 func (a ActionPong) Exec(_ context.Context, qCtx *query_context.Context, _ ChainWalker) error {
 	r := new(dns.Msg)
 	r.SetReply(qCtx.Q())
-	r.Rcode = 0
+	if a.AllowErr && qCtx.R() != nil {
+		r.Rcode = qCtx.R().Rcode
+	} else {
+		r.Rcode = 0
+	}
 	r.Authoritative = true
 	r.RecursionAvailable = true
 	r.Answer = []dns.RR{}
@@ -100,7 +105,14 @@ func (a ActionPong) Exec(_ context.Context, qCtx *query_context.Context, _ Chain
 
 func setupPong(_ BQ, s string) (any, error) {
 	if os.Getenv("ADDINFO") == "yes" {
-		return ActionPong{DebugInfo: s}, nil
+		return ActionPong{DebugInfo: s, AllowErr: false}, nil
+	}
+	return ActionReject{}, nil
+}
+
+func setupPongerr(_ BQ, s string) (any, error) {
+	if os.Getenv("ADDINFO") == "yes" {
+		return ActionPong{DebugInfo: s, AllowErr: true}, nil
 	}
 	return ActionReject{}, nil
 }

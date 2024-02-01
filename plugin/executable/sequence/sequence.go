@@ -34,6 +34,7 @@ func init() {
 	MustRegExecQuickSetup("ok", setupAccept)
 	MustRegExecQuickSetup("reject", setupReject)
 	MustRegExecQuickSetup("pong", setupPong)
+	MustRegExecQuickSetup("pongerr", setupPongerr)
 	MustRegExecQuickSetup("return", setupReturn)
 	MustRegExecQuickSetup("goto", setupGoto)
 	MustRegExecQuickSetup("jump", setupJump)
