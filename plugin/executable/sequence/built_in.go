@@ -86,18 +86,20 @@ func (a ActionPong) Exec(_ context.Context, qCtx *query_context.Context, _ Chain
 	r.Authoritative = true
 	r.RecursionAvailable = true
 	r.Answer = []dns.RR{}
-	if qCtx != nil {
-		query_time := "nil"
-		query_time = fmt.Sprintf("%dms", time.Since(qCtx.StartTime()).Milliseconds())
-		txtRecord := new(dns.TXT)
-		txtRecord.Hdr = dns.RR_Header{
-			Name:   time.Now().Format("20060102150405.000") + ".reject.paopaodns.",
-			Rrtype: dns.TypeTXT,
-			Class:  dns.ClassINET,
-			Ttl:    0,
+	if a.DebugInfo != "" {
+		if qCtx != nil {
+			query_time := "nil"
+			query_time = fmt.Sprintf("%dms", time.Since(qCtx.StartTime()).Milliseconds())
+			txtRecord := new(dns.TXT)
+			txtRecord.Hdr = dns.RR_Header{
+				Name:   time.Now().Format("20060102150405.000") + ".reject.paopaodns.",
+				Rrtype: dns.TypeTXT,
+				Class:  dns.ClassINET,
+				Ttl:    0,
+			}
+			txtRecord.Txt = []string{query_time + ", " + a.DebugInfo}
+			r.Extra = []dns.RR{txtRecord}
 		}
-		txtRecord.Txt = []string{query_time + ", " + a.DebugInfo}
-		r.Extra = []dns.RR{txtRecord}
 	}
 	qCtx.SetResponse(r)
 	return nil
@@ -107,14 +109,14 @@ func setupPong(_ BQ, s string) (any, error) {
 	if os.Getenv("ADDINFO") == "yes" {
 		return ActionPong{DebugInfo: s, AllowErr: false}, nil
 	}
-	return ActionReject{}, nil
+	return ActionPong{DebugInfo: "", AllowErr: false}, nil
 }
 
 func setupPongerr(_ BQ, s string) (any, error) {
 	if os.Getenv("ADDINFO") == "yes" {
 		return ActionPong{DebugInfo: s, AllowErr: true}, nil
 	}
-	return ActionReject{}, nil
+	return ActionPong{DebugInfo: "", AllowErr: true}, nil
 }
 
 var _ RecursiveExecutable = (*ActionReturn)(nil)
