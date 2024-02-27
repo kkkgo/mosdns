@@ -8,8 +8,8 @@ require (
 	github.com/oschwald/geoip2-golang v1.9.0
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
-	go.uber.org/zap v1.26.0
-	golang.org/x/exp v0.0.0-20240213143201-ec583247a57a
+	go.uber.org/zap v1.27.0
+	golang.org/x/exp v0.0.0-20240222234643-814bf88cf225
 	golang.org/x/net v0.21.0
 	golang.org/x/sync v0.6.0
 	golang.org/x/sys v0.17.0
