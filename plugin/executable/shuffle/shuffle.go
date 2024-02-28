@@ -41,7 +41,7 @@ func (s *Shuffle) Exec(_ context.Context, qCtx *query_context.Context) error {
 
     if s.lite {
         filteredAnswers :=  FilterType(response.Answer, request.Question[0].Qtype)
-         Shuffle(filteredAnswers)
+		ShuffleRecord(filteredAnswers)
         response.Answer = filteredAnswers
     } else {
          ShuffleSkipCNAME(response.Answer)
@@ -60,7 +60,7 @@ func  FilterType(answers []dns.RR, qtype uint16) []dns.RR {
     return filtered
 }
 
-func  Shuffle(answers []dns.RR) {
+func  ShuffleRecord(answers []dns.RR) {
     n := len(answers)
     for i := n - 1; i > 0; i-- {
         j := rand.Intn(i + 1)
