@@ -57,8 +57,8 @@ func (s *Shuffle) Exec(_ context.Context, qCtx *query_context.Context) error {
         response.Answer = filteredAnswers
     case 3: //shuffle
         ShuffleRecord(response.Answer)
-    default: //shuffle but not shuffle cname
-        ShuffleSkipCNAME(response.Answer)
+    default: //shuffle skip not query type
+        ShuffleSKIP(response.Answer)
     }
 
     return nil
@@ -82,14 +82,14 @@ func ShuffleRecord(answers []dns.RR) {
     }
 }
 
-func ShuffleSkipCNAME(answers []dns.RR) {
+func ShuffleSKIP(answers []dns.RR, qtype uint16) {
     n := len(answers)
     for i := 0; i < n; i++ {
-        if _, isCNAME := answers[i].(*dns.CNAME); isCNAME {
+        if answers[i].Header().Rrtype != qtype {
             continue
         }
         for j := i + 1; j < n; j++ {
-            if _, isCNAME := answers[j].(*dns.CNAME); !isCNAME {
+            if answers[j].Header().Rrtype == qtype {
                 randIndex := rand.Intn(j-i+1) + i
                 answers[i], answers[randIndex] = answers[randIndex], answers[i]
                 break
