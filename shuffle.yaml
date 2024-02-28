@@ -1,0 +1,38 @@
+log:
+    file: ""
+    level: error
+plugins:
+
+  - tag: try_chinanet
+    type: forward
+    args:
+      concurrent: 3
+      upstreams:
+        - addr: "udp://202.96.128.86"
+        - addr: "udp://202.96.134.33"
+        - addr: "udp://223.5.5.5"
+
+  - tag: main_sequence
+    type: sequence
+    args:
+        - exec: cache 102400
+        - matches: has_wanted_ans
+          exec: ok
+        - exec: $try_chinanet
+        - exec: shuffle 2
+
+  - tag: udp_server
+    type: udp_server
+    args:
+      entry: main_sequence
+      listen: :53
+  - tag: "tcp_server"
+    type: "tcp_server"
+    args:
+      entry: main_sequence
+      listen: :53
+      idle_timeout: 3
+
+# go run main.go start -c shuffle.yaml
+# docker run --rm --network="host" --dns 172.19.22.243 debian getent hosts www.aliyun.com
+# docker run --rm --network="host" --dns 223.5.5.5 debian getent hosts www.aliyun.com

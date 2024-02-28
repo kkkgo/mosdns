@@ -46,15 +46,15 @@ func (s *Shuffle) Exec(_ context.Context, qCtx *query_context.Context) error {
     if response == nil || response.Answer == nil {
         return nil
     }
-
+    originalName := request.Question[0].Name
     switch s.mode {
-    case 1: //filter and shuffle
-        filteredAnswers := FilterType(response.Answer, request.Question[0].Qtype)
+    case 1:
+        filteredAnswers := FilterType(response.Answer, request.Question[0].Qtype, originalName)
         ShuffleRecord(filteredAnswers)
         response.Answer = filteredAnswers
-    case 2: //filter
-        filteredAnswers := FilterType(response.Answer, request.Question[0].Qtype)
-        response.Answer = filteredAnswers
+    case 2:
+    filteredAnswers := FilterType(response.Answer, request.Question[0].Qtype, originalName)
+    response.Answer = filteredAnswers
     case 3: //shuffle
         ShuffleRecord(response.Answer)
     default: //shuffle skip not query type
@@ -64,10 +64,11 @@ func (s *Shuffle) Exec(_ context.Context, qCtx *query_context.Context) error {
     return nil
 }
 
-func FilterType(answers []dns.RR, qtype uint16) []dns.RR {
+func FilterType(answers []dns.RR, qtype uint16, originalName string) []dns.RR {
     var filtered []dns.RR
     for _, answer := range answers {
         if answer.Header().Rrtype == qtype {
+            answer.Header().Name = originalName
             filtered = append(filtered, answer)
         }
     }
