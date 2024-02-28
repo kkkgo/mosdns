@@ -58,7 +58,7 @@ func (s *Shuffle) Exec(_ context.Context, qCtx *query_context.Context) error {
     case 3: //shuffle
         ShuffleRecord(response.Answer)
     default: //shuffle skip not query type
-        ShuffleSKIP(response.Answer)
+        ShuffleSKIP(response.Answer, request.Question[0].Qtype)
     }
 
     return nil
