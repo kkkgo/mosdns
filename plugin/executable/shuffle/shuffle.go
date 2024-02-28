@@ -39,7 +39,7 @@ func (s *Shuffle) Exec(_ context.Context, qCtx *query_context.Context) error {
 	}
 
 	ShuffleDNSAnswers(response)
-	MoveCNAMEToLast(response)
+	MoveCNAMEToFirst(response)
 	return nil
 }
 
@@ -52,7 +52,7 @@ func ShuffleDNSAnswers(response *dns.Msg) {
 	}
 }
 
-func MoveCNAMEToLast(response *dns.Msg) {
+func MoveCNAMEToFirst(response *dns.Msg) {
 	answers := response.Answer
 	cnameRecords := make([]dns.RR, 0)
 	nonCnameRecords := make([]dns.RR, 0)
@@ -64,6 +64,6 @@ func MoveCNAMEToLast(response *dns.Msg) {
 			nonCnameRecords = append(nonCnameRecords, record)
 		}
 	}
-	answers = append(nonCnameRecords, cnameRecords...)
+	answers = append(cnameRecords, nonCnameRecords...)
 	response.Answer = answers
 }
