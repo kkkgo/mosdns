@@ -1,4 +1,4 @@
-// PaoPaoDNS shuffle with lite mode
+// PaoPaoDNS shuffle with lite modes
 
 package shuffle
 
@@ -19,16 +19,24 @@ func init() {
 }
 
 type Shuffle struct {
-    lite bool
+    mode int
 }
 
-func NewShuffle(lite bool) *Shuffle {
-    return &Shuffle{lite: lite}
+func NewShuffle(mode int) *Shuffle {
+    return &Shuffle{mode: mode}
 }
 
 func QuickSetup(_ sequence.BQ, s string) (interface{}, error) {
-    lite := s == "lite"
-    return NewShuffle(lite), nil
+    mode := 0
+    switch s {
+    case "1":
+        mode = 1
+    case "2":
+        mode = 2
+    case "3":
+        mode = 3
+    }
+    return NewShuffle(mode), nil
 }
 
 func (s *Shuffle) Exec(_ context.Context, qCtx *query_context.Context) error {
@@ -39,18 +47,24 @@ func (s *Shuffle) Exec(_ context.Context, qCtx *query_context.Context) error {
         return nil
     }
 
-    if s.lite {
-        filteredAnswers :=  FilterType(response.Answer, request.Question[0].Qtype)
-		ShuffleRecord(filteredAnswers)
+    switch s.mode {
+    case 1: //filter and shuffle
+        filteredAnswers := FilterType(response.Answer, request.Question[0].Qtype)
+        ShuffleRecord(filteredAnswers)
         response.Answer = filteredAnswers
-    } else {
-         ShuffleSkipCNAME(response.Answer)
+    case 2: //filter
+        filteredAnswers := FilterType(response.Answer, request.Question[0].Qtype)
+        response.Answer = filteredAnswers
+    case 3: //shuffle
+        ShuffleRecord(response.Answer)
+    default: //shuffle but not shuffle cname
+        ShuffleSkipCNAME(response.Answer)
     }
 
     return nil
 }
 
-func  FilterType(answers []dns.RR, qtype uint16) []dns.RR {
+func FilterType(answers []dns.RR, qtype uint16) []dns.RR {
     var filtered []dns.RR
     for _, answer := range answers {
         if answer.Header().Rrtype == qtype {
@@ -60,7 +74,7 @@ func  FilterType(answers []dns.RR, qtype uint16) []dns.RR {
     return filtered
 }
 
-func  ShuffleRecord(answers []dns.RR) {
+func ShuffleRecord(answers []dns.RR) {
     n := len(answers)
     for i := n - 1; i > 0; i-- {
         j := rand.Intn(i + 1)
@@ -68,7 +82,7 @@ func  ShuffleRecord(answers []dns.RR) {
     }
 }
 
-func  ShuffleSkipCNAME(answers []dns.RR) {
+func ShuffleSkipCNAME(answers []dns.RR) {
     n := len(answers)
     for i := 0; i < n; i++ {
         if _, isCNAME := answers[i].(*dns.CNAME); isCNAME {
