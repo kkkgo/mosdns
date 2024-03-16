@@ -1,0 +1,34 @@
+log:
+    file: ""
+    level: error
+plugins:
+
+  - tag: try_chinanet
+    type: forward
+    args:
+      concurrent: 3
+      upstreams:
+        - addr: "udp://223.5.5.5"
+
+  - tag: main_sequence
+    type: sequence
+    args:
+        - exec: $try_chinanet
+        - exec: black_hole 1.1.1.1  1.1.1.1  1.1.1.1  1.1.1.1  1.1.1.1 
+        - exec: shuffle 4
+        - exec: addinfo forward -> {CUSTOM_FORWARD_SERVER}@{CUSTOM_FORWARD_PORT}
+  
+        - exec: addinfo respond mosdns cache
+  - tag: udp_server
+    type: udp_server
+    args:
+      entry: main_sequence
+      listen: :53
+  - tag: "tcp_server"
+    type: "tcp_server"
+    args:
+      entry: main_sequence
+      listen: :53
+      idle_timeout: 3
+
+# go run main.go start -c size.yaml
