@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	version = "kkkgo/mosdns:240229.1"
+	version = "kkkgo/mosdns:240317.1"
 )
 
 func init() {
