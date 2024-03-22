@@ -21,6 +21,7 @@ package dns_handler
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/IrineSistiana/mosdns/v5/mlog"
@@ -30,6 +31,8 @@ import (
 	"github.com/miekg/dns"
 	"go.uber.org/zap"
 )
+
+var addInfoEnabled bool
 
 const (
 	defaultQueryTimeout = time.Millisecond * 4500
@@ -64,6 +67,7 @@ type EntryHandlerOpts struct {
 }
 
 func (opts *EntryHandlerOpts) init() {
+	addInfoEnabled = os.Getenv("ADDINFO") == "yes"
 	if opts.Logger == nil {
 		opts.Logger = nopLogger
 	}
@@ -98,15 +102,17 @@ func (h *EntryHandler) ServeDNS(ctx context.Context, qCtx *query_context.Context
 		respMsg = new(dns.Msg)
 		respMsg.SetReply(qCtx.Q())
 		respMsg.Rcode = dns.RcodeNameError
-		txtRecord := new(dns.TXT)
-		txtRecord.Hdr = dns.RR_Header{
-			Name:   time.Now().Format("20060102150405.000000000") + ".REFUSED.paopaodns.",
-			Rrtype: dns.TypeTXT,
-			Class:  dns.ClassINET,
-			Ttl:    0,
+		if addInfoEnabled {
+			txtRecord := new(dns.TXT)
+			txtRecord.Hdr = dns.RR_Header{
+				Name:   time.Now().Format("20060102150405.000000000") + ".REFUSED.paopaodns.",
+				Rrtype: dns.TypeTXT,
+				Class:  dns.ClassINET,
+				Ttl:    0,
+			}
+			txtRecord.Txt = []string{"Process terminated due to no wanted answers , status: REFUSED"}
+			respMsg.Extra = append(respMsg.Extra, txtRecord)
 		}
-		txtRecord.Txt = []string{"Process terminated due to no wanted answers , status: REFUSED"}
-		respMsg.Extra = append(respMsg.Extra, txtRecord)
 	}
 	if err != nil {
 		respMsg = new(dns.Msg)
