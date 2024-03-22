@@ -15,7 +15,10 @@ import (
 
 const PluginType = "ip_rewrite"
 
+var addInfoEnabled bool
+
 func init() {
+	addInfoEnabled = os.Getenv("ADDINFO") == "yes"
 	sequence.MustRegExecQuickSetup(PluginType, QuickSetup)
 }
 
@@ -119,7 +122,7 @@ func (b *IPRewrite) Response(q *dns.Msg, a []dns.RR) *dns.Msg {
 	return nil
 }
 func (b *IPRewrite) addinfo(r *dns.Msg) *dns.Msg {
-	if os.Getenv("ADDINFO") == "yes" && r != nil {
+	if addInfoEnabled && r != nil {
 		txtRecord := new(dns.TXT)
 		txtRecord.Hdr = dns.RR_Header{
 			Name:   time.Now().Format("20060102150405.0000000") + ".swap.paopaodns.",

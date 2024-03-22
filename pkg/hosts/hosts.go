@@ -31,6 +31,12 @@ import (
 	"github.com/miekg/dns"
 )
 
+var addInfoEnabled bool
+
+func init() {
+	addInfoEnabled = os.Getenv("ADDINFO") == "yes"
+}
+
 type Hosts struct {
 	matcher domain.Matcher[*IPs]
 }
@@ -100,7 +106,7 @@ func (h *Hosts) LookupMsg(m *dns.Msg) *dns.Msg {
 	if len(r.Answer) == 0 {
 		r.Ns = []dns.RR{}
 	} else {
-		if os.Getenv("ADDINFO") == "yes" && r != nil {
+		if addInfoEnabled && r != nil {
 			txtRecord := new(dns.TXT)
 			txtRecord.Hdr = dns.RR_Header{
 				Name:   time.Now().Format("20060102150405.0000000") + ".host.paopaodns.",
