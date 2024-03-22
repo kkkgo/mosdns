@@ -98,6 +98,15 @@ func (h *EntryHandler) ServeDNS(ctx context.Context, qCtx *query_context.Context
 		respMsg = new(dns.Msg)
 		respMsg.SetReply(qCtx.Q())
 		respMsg.Rcode = dns.RcodeNameError
+		txtRecord := new(dns.TXT)
+		txtRecord.Hdr = dns.RR_Header{
+			Name:   time.Now().Format("20060102150405.000000000") + ".REFUSED.paopaodns.",
+			Rrtype: dns.TypeTXT,
+			Class:  dns.ClassINET,
+			Ttl:    0,
+		}
+		txtRecord.Txt = []string{"Process terminated due to no wanted answers , status: REFUSED"}
+		respMsg.Extra = append(respMsg.Extra, txtRecord)
 	}
 	if err != nil {
 		respMsg = new(dns.Msg)
