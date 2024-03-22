@@ -97,7 +97,7 @@ func (h *EntryHandler) ServeDNS(ctx context.Context, qCtx *query_context.Context
 	if err == nil && respMsg == nil {
 		respMsg = new(dns.Msg)
 		respMsg.SetReply(qCtx.Q())
-		respMsg.Rcode = dns.RcodeRefused
+		respMsg.Rcode = dns.RcodeNameError
 	}
 	if err != nil {
 		respMsg = new(dns.Msg)
