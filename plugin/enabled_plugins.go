@@ -110,5 +110,7 @@ import (
 
 	_ "github.com/IrineSistiana/mosdns/v5/plugin/server/udp_server"
 
+	_ "github.com/IrineSistiana/mosdns/v5/plugin/server/flushd_server"
+
 	_ "github.com/IrineSistiana/mosdns/v5/plugin/server/httpd_server"
 )

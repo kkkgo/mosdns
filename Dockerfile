@@ -1,5 +1,5 @@
 FROM alpine:edge AS check
-RUN apk add --no-cache go curl
+RUN apk update && apk upgrade && apk add --no-cache go curl socat
 WORKDIR /src
 COPY . /src/
 RUN rm go.mod go.sum

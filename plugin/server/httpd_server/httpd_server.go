@@ -15,11 +15,24 @@ import (
 	"github.com/IrineSistiana/mosdns/v5/coremain"
 )
 
+const PluginType = "httpd_server"
+
 func init() {
-	coremain.RegNewPluginFunc("httpd_server", Init, func() any { return new(struct{}) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() any { return new(struct{}) })
+}
+
+type HTTPServer struct {
+	server *http.Server
 }
 
 func Init(bp *coremain.BP, args any) (any, error) {
+	httpServer := &HTTPServer{
+		server: &http.Server{
+			Addr:    ":7889",
+			Handler: http.DefaultServeMux,
+		},
+	}
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		dirPath := "/data"
@@ -51,10 +64,17 @@ func Init(bp *coremain.BP, args any) (any, error) {
 		}
 	})
 
-	fmt.Println("httpd on port 7889...")
-	err := http.ListenAndServe(":7889", nil)
-	if err != nil {
-		fmt.Println("Server error:", err)
-	}
-	return nil, nil
+	go func() {
+		fmt.Println("httpd on port 7889...")
+		err := httpServer.server.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			fmt.Println("Server error:", err)
+		}
+	}()
+
+	return httpServer, nil
+}
+
+func (s *HTTPServer) Close() error {
+	return s.server.Shutdown(nil)
 }

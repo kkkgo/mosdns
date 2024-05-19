@@ -79,5 +79,9 @@ plugins:
       entry: main_sequence
       listen: :5301
       idle_timeout: 5
+  
+  - tag: "flushd_server"
+    type: "flushd_server"
+
   - tag: "httpd_server"
     type: "httpd_server"

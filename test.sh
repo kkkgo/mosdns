@@ -4,6 +4,7 @@ mosdns start -d /src -c test.yaml &
 ls -lah  /usr/bin/mosdns
 sleep 3
 curl http://127.0.0.1:7889
+echo "example.com" | socat - UNIX-CONNECT:/tmp/flush.sock
 nslookup test1.dns 127.0.0.1
 nslookup test2.dns 127.0.0.1
 nslookup test3.dns 127.0.0.1

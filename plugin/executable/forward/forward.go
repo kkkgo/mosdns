@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -55,6 +56,7 @@ type Args struct {
 	Concurrent int              `yaml:"concurrent"`
 	QTime      int              `yaml:"qtime"`
 	Allowcode  int              `yaml:"allowcode"`
+	Flush      int              `yaml:"flush"`
 	// Global options.
 	Socks5       string `yaml:"socks5"`
 	SoMark       int    `yaml:"so_mark"`
@@ -180,6 +182,16 @@ func (f *Forward) Exec(ctx context.Context, qCtx *query_context.Context) (err er
 	return nil
 }
 
+func (f *Forward) flushDomain(domain string) {
+	conn, err := net.Dial("unix", "/tmp/flush.sock")
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+
+	_, _ = fmt.Fprintf(conn, "%s\n", domain)
+}
+
 // QuickConfigureExec format: [upstream_tag]...
 func (f *Forward) QuickConfigureExec(args string) (any, error) {
 	var us map[*upstreamWrapper]struct{}
@@ -283,6 +295,15 @@ func (f *Forward) exchange(ctx context.Context, qCtx *query_context.Context, us 
 				continue
 			}
 			if r.Rcode <= f.args.Allowcode {
+				// Check if the TTL of any answer is 0 and Flush is enabled
+				if f.args.Flush > 0 && r.Answer != nil {
+					for _, rr := range r.Answer {
+						if rr.Header().Ttl == 0 {
+							f.flushDomain(qCtx.Q().Question[0].Name)
+							break
+						}
+					}
+				}
 				return r, nil
 			}
 		case <-ctx.Done():
