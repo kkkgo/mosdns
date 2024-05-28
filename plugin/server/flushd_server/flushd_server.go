@@ -29,10 +29,9 @@ type request struct {
 var (
 	requestQueue = make(chan request, 100)
 	wg           sync.WaitGroup
-	logger       *zap.Logger
 )
 
-func handleRequest(r request) {
+func handleRequest(r request, logger *zap.Logger) {
 	defer wg.Done()
 
 	domain := r.domain
@@ -49,7 +48,7 @@ func handleRequest(r request) {
 		logger.Info("DNS response", zap.String("domain", domain), zap.Int("TTL", int(resp.Answer[0].Header().Ttl)))
 
 		if resp.Answer[0].Header().Ttl == 0 {
-			flushCache(domain)
+			flushCache(domain, logger)
 
 			resp, err = dns.Exchange(m, dnsServer)
 			if err != nil {
@@ -66,7 +65,7 @@ func handleRequest(r request) {
 	}
 }
 
-func flushCache(domain string) {
+func flushCache(domain string, logger *zap.Logger) {
 	conn, err := net.Dial("unix", unboundSocket)
 	if err != nil {
 		logger.Warn("Error connecting to unbound socket", zap.Error(err))
@@ -96,7 +95,7 @@ func flushCache(domain string) {
 	}
 }
 
-func handleConnection(conn net.Conn) {
+func handleConnection(conn net.Conn, logger *zap.Logger) {
 	defer conn.Close()
 
 	reader := bufio.NewReader(conn)
@@ -112,22 +111,21 @@ func handleConnection(conn net.Conn) {
 	logger.Info("Received request for domain", zap.String("domain", domain))
 }
 
-func processQueue() {
+func processQueue(logger *zap.Logger) {
 	for r := range requestQueue {
 		<-r.timer.C
 		wg.Add(1)
-		go handleRequest(r)
+		go handleRequest(r, logger)
 	}
 }
 
 func Init(bp *coremain.BP, args any) (any, error) {
-	logger, _ = zap.NewDevelopment()
-	defer logger.Sync()
+	logger := bp.L()
 
 	os.Remove(sockPath)
 	listener, err := net.Listen("unix", sockPath)
 	if err != nil {
-		logger.Warn("Creat unix err:", zap.Error(err))
+		logger.Warn("Error creating unix socket listener", zap.Error(err))
 		return nil, err
 	}
 
@@ -135,16 +133,15 @@ func Init(bp *coremain.BP, args any) (any, error) {
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
-				logger.Warn("Accept unix conn err:", zap.Error(err))
+				logger.Warn("Error accepting unix connection", zap.Error(err))
 				continue
 			}
 
-			go handleConnection(conn)
+			go handleConnection(conn, logger)
 		}
 	}()
 
-	go processQueue()
-
+	go processQueue(logger)
 	fmt.Println("flushd server start on path", sockPath, "...")
 
 	return nil, nil
