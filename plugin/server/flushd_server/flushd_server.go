@@ -39,29 +39,23 @@ func handleRequest(r request, logger *zap.Logger) {
 	m := new(dns.Msg)
 	m.SetQuestion(dns.Fqdn(domain), dns.TypeA)
 	resp, err := dns.Exchange(m, dnsServer)
-	if err != nil {
+	if err != nil || resp == nil || len(resp.Answer) == 0 {
 		logger.Warn("Error querying DNS", zap.String("domain", domain), zap.Error(err))
 		return
 	}
 
-	if len(resp.Answer) > 0 {
-		logger.Info("DNS response", zap.String("domain", domain), zap.Int("TTL", int(resp.Answer[0].Header().Ttl)))
+	logger.Info("DNS response", zap.String("domain", domain), zap.Int("TTL", int(resp.Answer[0].Header().Ttl)))
 
-		if resp.Answer[0].Header().Ttl == 0 {
-			flushCache(domain, logger)
-
-			resp, err = dns.Exchange(m, dnsServer)
-			if err != nil {
-				logger.Warn("Error querying DNS after flush", zap.String("domain", domain), zap.Error(err))
-				return
-			}
-
-			logger.Info("DNS response after flush", zap.String("domain", domain), zap.Int("TTL", int(resp.Answer[0].Header().Ttl)))
-		} else {
-			logger.Info("No need to flush cache", zap.String("domain", domain))
+	if resp.Answer[0].Header().Ttl == 0 {
+		flushCache(domain, logger)
+		resp, err = dns.Exchange(m, dnsServer)
+		if err != nil || resp == nil || len(resp.Answer) == 0 {
+			logger.Warn("Error querying DNS after flush", zap.String("domain", domain), zap.Error(err))
+			return
 		}
+		logger.Info("DNS response after flush", zap.String("domain", domain), zap.Int("TTL", int(resp.Answer[0].Header().Ttl)))
 	} else {
-		logger.Info("No valid DNS response", zap.String("domain", domain))
+		logger.Info("No need to flush cache", zap.String("domain", domain))
 	}
 }
 
