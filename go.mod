@@ -5,11 +5,11 @@ go 1.22.3
 require (
 	github.com/miekg/dns v1.1.59
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/oschwald/geoip2-golang v1.9.0
+	github.com/oschwald/geoip2-golang v1.11.0
 	github.com/spf13/cobra v1.8.0
-	github.com/spf13/viper v1.18.2
+	github.com/spf13/viper v1.19.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/exp v0.0.0-20240529005216-23cca8864a10
+	golang.org/x/exp v0.0.0-20240531132922-fd00a4e0eefc
 	golang.org/x/net v0.25.0
 	golang.org/x/sync v0.7.0
 	golang.org/x/sys v0.20.0
@@ -21,9 +21,9 @@ require (
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
-	github.com/oschwald/maxminddb-golang v1.12.0 // indirect
+	github.com/oschwald/maxminddb-golang v1.13.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
-	github.com/sagikazarmark/locafero v0.4.0 // indirect
+	github.com/sagikazarmark/locafero v0.5.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
