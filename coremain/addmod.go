@@ -143,9 +143,14 @@ func genZones(zones []ZoneConfig) (string, string, []string, []int) {
 			zoneseq = 9
 		}
 		orders = append(orders, zoneseq)
-		qnames = append(qnames, fmt.Sprintf(`        - matches: qname domain:%s
+		qnamePrefix := ""
+		if !(strings.HasPrefix(zone.Zone, "domain:") || strings.HasPrefix(zone.Zone, "full:") || strings.HasPrefix(zone.Zone, "regexp:") || strings.HasPrefix(zone.Zone, "keyword:")) {
+			qnamePrefix = "domain:"
+		}
+
+		qnames = append(qnames, fmt.Sprintf(`        - matches: qname %s%s
           exec: goto sequence@%s
-`, zone.Zone, zone.Zone))
+`, qnamePrefix, zone.Zone, zone.Zone))
 	}
 
 	return forwardText.String(), sequenceText.String(), qnames, orders

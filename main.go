@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	version = "kkkgo/mosdns:240529.1"
+	version = "kkkgo/mosdns:240722.1"
 )
 
 func init() {
@@ -52,6 +52,13 @@ func init() {
 		Short: "Curl url filename[s] socks[no]",
 		Run: func(cmd *cobra.Command, args []string) {
 			coremain.Curl(args)
+		},
+	})
+	coremain.AddSubCmd(&cobra.Command{
+		Use:   "eat",
+		Short: "eat list",
+		Run: func(cmd *cobra.Command, args []string) {
+			coremain.Eatlist(args)
 		},
 	})
 }
