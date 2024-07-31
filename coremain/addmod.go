@@ -1,7 +1,6 @@
 package coremain
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"regexp"
@@ -10,224 +9,234 @@ import (
 	"github.com/spf13/viper"
 )
 
-type ZoneConfig struct {
-	Zone   string
-	DNS    string
-	Socks5 string
-	TTL    int
-	Seq    string
+type ModConfig struct {
+	Zones []Zone `mapstructure:"Zones"`
+	Swaps []Swap `mapstructure:"Swaps"`
 }
 
-type SwapsConfig struct {
-	Env_key   string
-	Cidr_file string
+type Zone struct {
+	Zone   string `mapstructure:"zone"`
+	DNS    string `mapstructure:"dns"`
+	TTL    int    `mapstructure:"ttl"`
+	Seq    string `mapstructure:"seq"`
+	Socks5 string `mapstructure:"socks5"`
 }
 
-type AddModConfig struct {
-	Zones []ZoneConfig
-	Swaps []SwapsConfig
+type Swap struct {
+	EnvKey   string `mapstructure:"env_key"`
+	CIDRFile string `mapstructure:"cidr_file"`
 }
-
-var allcontent string
 
 func AddMod() {
-	viper.SetConfigFile("/data/custom_mod.yaml")
-	err := viper.ReadInConfig()
+	v := viper.New()
+	v.SetConfigFile("/data/custom_mod.yaml")
+	v.SetConfigType("yaml")
+
+	if err := v.ReadInConfig(); err != nil {
+		fmt.Println("Error reading config file:", err)
+		return
+	}
+
+	var config ModConfig
+	if err := v.Unmarshal(&config); err != nil {
+		fmt.Println("Error parsing config file:", err)
+		return
+	}
+
+	templateData, err := os.ReadFile("/tmp/mosdns.yaml")
 	if err != nil {
-		fmt.Printf("Unable Load Custom_mod: %s\n", err)
-		return
-	}
-	var config AddModConfig
-	err = viper.Unmarshal(&config)
-	if err != nil {
-		fmt.Printf("Error unmarshaling Custom_mod: %s\n", err)
-		return
-	}
-	// fmt.Println(config.Zones)
-	// fmt.Println(config.Swaps)
-
-	filePath := "/tmp/mosdns.yaml"
-	if err := readConfigFile(filePath); err != nil {
-		fmt.Printf("Error reading file: %v\n", err)
+		fmt.Println("Error reading template file:", err)
 		return
 	}
 
-	//get yaml config.
-	dns, seq, qnames, orders := genZones(config.Zones)
-	ipset, rewrite := genSwaps(config.Swaps)
-	insertAfterKeyStart("zones_dns_start", dns)
-	insertAfterKeyStart("zones_seq_start", seq)
+	template := string(templateData)
 
-	for i, order := range orders {
-		switch order {
-		case 0:
-			insertAfterKeyStart("zones_qname_top_start", qnames[i])
-		case 6:
-			insertAfterKeyStart("zones_qname_top6_start", qnames[i])
-		case 9:
-			insertAfterKeyStart("zones_qname_list_start", qnames[i])
+	forwardPlugins := make(map[string]string)
+	sequencePlugins := make(map[string]string)
+	zoneMatches := make(map[string][]Zone)
+	forwardCount := 0
+	sequenceCount := 0
+	var socks5Pattern = regexp.MustCompile(`^.+:[0-9]+$`)
+
+	for _, zone := range config.Zones {
+		socks5Value := ""
+		if zone.Socks5 == "yes" {
+			socks5Value = os.Getenv("SOCKS5")
+			if socks5Value == "" || !socks5Pattern.MatchString(socks5Value) {
+				fmt.Println("[PaoPaoDNS ZONE]! SOCKS5 not found or invalid, skipping zone:", zone.Zone)
+				continue
+			}
+		}
+
+		forwardKey := fmt.Sprintf("%s%s", zone.DNS, socks5Value)
+		sequenceKey := fmt.Sprintf("%s%s%d", zone.DNS, socks5Value, zone.TTL)
+
+		var forwardTag string
+		if tag, exists := forwardPlugins[forwardKey]; exists {
+			forwardTag = tag
+		} else {
+			forwardCount++
+			forwardTag = fmt.Sprintf("forward_zones@%d", forwardCount)
+			forwardPlugins[forwardKey] = forwardTag
+		}
+
+		var sequenceTag string
+		if tag, exists := sequencePlugins[sequenceKey]; exists {
+			sequenceTag = tag
+		} else {
+			sequenceCount++
+			sequenceTag = fmt.Sprintf("sequence@%d", sequenceCount)
+			sequencePlugins[sequenceKey] = sequenceTag
+		}
+
+		zoneMatches[sequenceTag] = append(zoneMatches[sequenceTag], zone)
+	}
+
+	var forwardConfig strings.Builder
+	for forwardKey, forwardTag := range forwardPlugins {
+		forwardConfig.WriteString(generateForwardPlugin(forwardTag, forwardKey, config.Zones))
+	}
+	template = strings.Replace(template, "##zones_dns_start##\n##zones_dns_end##", "##zones_dns_start##\n"+forwardConfig.String()+"##zones_dns_end##", 1)
+
+	var sequenceConfig strings.Builder
+	for sequenceKey, sequenceTag := range sequencePlugins {
+		sequenceConfig.WriteString(generateSequencePlugin(sequenceTag, sequenceKey, config.Zones, forwardPlugins))
+	}
+	template = strings.Replace(template, "##zones_seq_start##\n##zones_seq_end##", "##zones_seq_start##\n"+sequenceConfig.String()+"##zones_seq_end##", 1)
+
+	var topConfig, top6Config, listConfig strings.Builder
+	for sequenceTag, zones := range zoneMatches {
+		var zoneNames []string
+		for _, zone := range zones {
+			zoneName := zone.Zone
+			if !strings.Contains(zoneName, ":") {
+				zoneName = "domain:" + zoneName
+			}
+			zoneNames = append(zoneNames, zoneName)
+		}
+		matchConfig := fmt.Sprintf("        - matches: qname %s\n          exec: goto %s\n", strings.Join(zoneNames, " "), sequenceTag)
+		switch zones[0].Seq {
+		case "top6":
+			top6Config.WriteString(matchConfig)
+		case "list":
+			listConfig.WriteString(matchConfig)
+		default:
+			topConfig.WriteString(matchConfig)
 		}
 	}
+	template = strings.Replace(template, "##zones_qname_top_start##\n##zones_qname_top_end##", "##zones_qname_top_start##\n"+topConfig.String()+"##zones_qname_top_end##", 1)
+	template = strings.Replace(template, "##zones_qname_top6_start##\n##zones_qname_top6_end##", "##zones_qname_top6_start##\n"+top6Config.String()+"##zones_qname_top6_end##", 1)
+	template = strings.Replace(template, "##zones_qname_list_start##\n##zones_qname_list_end##", "##zones_qname_list_start##\n"+listConfig.String()+"##zones_qname_list_end##", 1)
 
-	insertAfterKeyStart("swaps_ipset_start", ipset)
-	insertAfterKeyStart("swaps_match_start", rewrite)
-	// fmt.Println(allcontent)
-
-	outputFilePath := "/tmp/mosdns_mod.yaml"
-	if err := writeToFile(outputFilePath); err != nil {
-		fmt.Printf("Error writing to file: %v\n", err)
-	}
-}
-
-// return forward, seq, match
-func genZones(zones []ZoneConfig) (string, string, []string, []int) {
-	var forwardText strings.Builder
-	var sequenceText strings.Builder
-	var qnames []string
-	var orders []int
-	socks5AddressRegex := regexp.MustCompile(`^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|\[[:0-9a-fA-F]+\])(:\d{1,5})$`)
-	match := socks5AddressRegex.MatchString(os.Getenv("SOCKS5"))
-	for _, zone := range zones {
-		if zone.DNS == "" {
+	envKeyToCIDRFiles := make(map[string][]string)
+	seenCIDRFiles := make(map[string]bool)
+	for _, swap := range config.Swaps {
+		if _, err := os.Stat(swap.CIDRFile); os.IsNotExist(err) {
+			fmt.Printf("[PaoPaoDNS SWAP]! CIDR file not found: %s\n", swap.CIDRFile)
 			continue
 		}
-
-		//gen forward
-		dnsAddresses := strings.Split(zone.DNS, ",")
-		var upstreamsText strings.Builder
-		for _, dnsAddress := range dnsAddresses {
-			socks5Option := ""
-			if strings.HasPrefix(dnsAddress, "tcp://") && zone.Socks5 == "yes" && match {
-				if os.Getenv("SOCKS5") != "" {
-					socks5Option = fmt.Sprintf("          socks5: \"%s\"\n", os.Getenv("SOCKS5"))
-				}
+		if envValue := os.Getenv(swap.EnvKey); envValue != "" {
+			if seenCIDRFiles[swap.CIDRFile] {
+				fmt.Printf("[PaoPaoDNS SWAP]! CIDR file %s is already matched to an env_key, skipping\n", swap.CIDRFile)
+				continue
 			}
-
-			upstreamsText.WriteString(fmt.Sprintf("        - addr: \"%s\"\n", dnsAddress))
-			upstreamsText.WriteString(socks5Option)
+			envKeyToCIDRFiles[swap.EnvKey] = append(envKeyToCIDRFiles[swap.EnvKey], swap.CIDRFile)
+			seenCIDRFiles[swap.CIDRFile] = true
+			fmt.Printf("[PaoPaoDNS SWAP] load: %s = %s\n", swap.EnvKey, envValue)
+		} else {
+			fmt.Printf("[PaoPaoDNS SWAP]! Env key not found or empty: %s\n", swap.EnvKey)
 		}
+	}
 
-		forwardText.WriteString(fmt.Sprintf(`  - tag: forward_zones@%s
+	var matchConfig strings.Builder
+	for envKey, cidrFiles := range envKeyToCIDRFiles {
+		if len(cidrFiles) > 1 {
+			matchConfig.WriteString(fmt.Sprintf("        - matches: resp_ip &%s\n          exec: ip_rewrite %s\n", strings.Join(cidrFiles, " &"), envKey))
+		} else {
+			matchConfig.WriteString(fmt.Sprintf("        - matches: resp_ip &%s\n          exec: ip_rewrite %s\n", cidrFiles[0], envKey))
+		}
+	}
+	template = strings.Replace(template, "##swaps_match_start##\n##swaps_match_end##", "##swaps_match_start##\n"+matchConfig.String()+"##swaps_match_end##", 1)
+
+	err = os.WriteFile("/tmp/mosdns_mod.yaml", []byte(template), 0644)
+	if err != nil {
+		fmt.Println("Error writing output file:", err)
+		return
+	}
+
+	fmt.Println("[PaoPaoDNS ADDMOD] Configuration generated.")
+}
+
+func generateForwardPlugin(tag, key string, zones []Zone) string {
+	var zone Zone
+	var socks5Value string
+	var socks5Pattern = regexp.MustCompile(`^.+:[0-9]+$`)
+	for _, z := range zones {
+		if z.Socks5 == "yes" {
+			socks5Value = os.Getenv("SOCKS5")
+			if socks5Value == "" || !socks5Pattern.MatchString(socks5Value) {
+				continue
+			}
+		}
+		if fmt.Sprintf("%s%s", z.DNS, socks5Value) == key {
+			zone = z
+			break
+		}
+	}
+
+	var socks5Config string
+	if socks5Value != "" {
+		socks5Config = fmt.Sprintf("      socks5: %s\n", socks5Value)
+	}
+
+	return fmt.Sprintf(`  - tag: %s
     type: forward
     args:
       concurrent: 3
       allowcode: 23
-      upstreams:
-%s`, zone.Zone, upstreamsText.String()))
-
-		forwardText.WriteString("\n")
-
-		//gen seq
-		sequenceText.WriteString(fmt.Sprintf(`  - tag: sequence@%s
-    type: sequence
-    args:
-        - exec: $forward_zones@%s
-`, zone.Zone, zone.Zone))
-		if zone.TTL > 0 {
-			sequenceText.WriteString(fmt.Sprintf(`        - exec: ttl 0-%d
-`, zone.TTL))
-		}
-		if os.Getenv("ADDINFO") == "yes" {
-			sequenceText.WriteString(fmt.Sprintf(`        - exec: addinfo [zone forward] -> %s
-`, zone.Zone))
-		}
-		sequenceText.WriteString(`        - exec: ok
-`)
-
-		//gen qname match
-		zoneseq := 0
-		if zone.Seq == "top6" {
-			zoneseq = 6
-		}
-		if zone.Seq == "list" {
-			zoneseq = 9
-		}
-		orders = append(orders, zoneseq)
-		qnamePrefix := ""
-		if !(strings.HasPrefix(zone.Zone, "domain:") || strings.HasPrefix(zone.Zone, "full:") || strings.HasPrefix(zone.Zone, "regexp:") || strings.HasPrefix(zone.Zone, "keyword:")) {
-			qnamePrefix = "domain:"
-		}
-
-		qnames = append(qnames, fmt.Sprintf(`        - matches: qname %s%s
-          exec: goto sequence@%s
-`, qnamePrefix, zone.Zone, zone.Zone))
-	}
-
-	return forwardText.String(), sequenceText.String(), qnames, orders
+%s      upstreams:
+%s
+`, tag, socks5Config, generateUpstreams(zone.DNS))
 }
 
-// return ip_set, match
-func genSwaps(swaps []SwapsConfig) (string, string) {
-	var ipsetText strings.Builder
-	var rewriteText strings.Builder
+func generateUpstreams(dns string) string {
+	var upstreams strings.Builder
+	for _, addr := range strings.Split(dns, ",") {
+		upstreams.WriteString(fmt.Sprintf("        - addr: \"%s\"\n", addr))
+	}
+	return upstreams.String()
+}
 
-	for _, swap := range swaps {
-		if swap.Env_key == "" || swap.Cidr_file == "" {
-			continue
+func generateSequencePlugin(tag, key string, zones []Zone, forwardPlugins map[string]string) string {
+	var zone Zone
+	var socks5Value string
+	var socks5Pattern = regexp.MustCompile(`^.+:[0-9]+$`)
+
+	for _, z := range zones {
+		if z.Socks5 == "yes" {
+			socks5Value = os.Getenv("SOCKS5")
+			if socks5Value == "" || !socks5Pattern.MatchString(socks5Value) {
+				continue
+			}
 		}
-
-		ipsetText.WriteString(fmt.Sprintf(`  - tag: ip_set@%s
-    type: ip_set
-    args:
-        files:
-          - "%s"
-`, swap.Env_key, swap.Cidr_file))
-
-		//gen resp match
-		rewriteText.WriteString(fmt.Sprintf(`        - matches: resp_ip $ip_set@%s
-          exec: ip_rewrite %s
-`, swap.Env_key, swap.Env_key))
-	}
-	return ipsetText.String(), rewriteText.String()
-}
-
-func readConfigFile(filePath string) error {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		allcontent += scanner.Text() + "\n"
-	}
-
-	if scanner.Err() != nil {
-		return scanner.Err()
-	}
-
-	return nil
-}
-
-func insertAfterKeyStart(keystart, content string) {
-	lines := strings.Split(allcontent, "\n")
-	for i, line := range lines {
-		if strings.Contains(line, keystart) {
-			lines = append(lines[:i+1], append([]string{content}, lines[i+1:]...)...)
+		if fmt.Sprintf("%s%s%d", z.DNS, socks5Value, z.TTL) == key {
+			zone = z
 			break
 		}
 	}
-	allcontent = strings.Join(lines, "\n")
-}
 
-func writeToFile(filePath string) error {
-	file, err := os.Create(filePath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	writer := bufio.NewWriter(file)
-	_, err = writer.WriteString(allcontent)
-	if err != nil {
-		return err
+	ttlConfig := ""
+	if zone.TTL > 0 {
+		ttlConfig = fmt.Sprintf("        - exec: ttl 0-%d\n", zone.TTL)
 	}
 
-	err = writer.Flush()
-	if err != nil {
-		return err
-	}
+	forwardKey := fmt.Sprintf("%s%s", zone.DNS, socks5Value)
+	forwardTag := forwardPlugins[forwardKey]
 
-	return nil
+	return fmt.Sprintf(`  - tag: %s
+    type: sequence
+    args:
+        - exec: $%s
+%s        - exec: ok
+`, tag, forwardTag, ttlConfig)
 }
