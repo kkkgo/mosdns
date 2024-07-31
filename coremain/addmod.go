@@ -163,8 +163,6 @@ func AddMod() {
 		fmt.Println("Error writing output file:", err)
 		return
 	}
-
-	fmt.Println("[PaoPaoDNS ADDMOD] Configuration generated.")
 }
 
 func generateForwardPlugin(tag, key string, zones []Zone) string {
