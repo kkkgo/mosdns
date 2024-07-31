@@ -142,7 +142,7 @@ func AddMod() {
 			}
 			envKeyToCIDRFiles[swap.EnvKey] = append(envKeyToCIDRFiles[swap.EnvKey], swap.CIDRFile)
 			seenCIDRFiles[swap.CIDRFile] = true
-			fmt.Printf("[PaoPaoDNS SWAP] load: %s = %s\n", swap.EnvKey, envValue)
+			fmt.Printf("[PaoPaoDNS SWAP] get: %s = %s\n", swap.EnvKey, envValue)
 		} else {
 			fmt.Printf("[PaoPaoDNS SWAP]! Env key not found or empty: %s\n", swap.EnvKey)
 		}
