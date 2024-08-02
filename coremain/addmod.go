@@ -12,6 +12,7 @@ import (
 type ModConfig struct {
 	Zones []Zone `mapstructure:"Zones"`
 	Swaps []Swap `mapstructure:"Swaps"`
+	Hosts []Host `mapstructure:"Hosts"`
 }
 
 type Zone struct {
@@ -25,6 +26,11 @@ type Zone struct {
 type Swap struct {
 	EnvKey   string `mapstructure:"env_key"`
 	CIDRFile string `mapstructure:"cidr_file"`
+}
+
+type Host struct {
+	EnvKey string `mapstructure:"env_key"`
+	Zone   string `mapstructure:"zone"`
 }
 
 func AddMod() {
@@ -43,7 +49,7 @@ func AddMod() {
 		return
 	}
 
-	templateData, err := os.ReadFile("/tmp/mosdns.yaml")
+	templateData, err := os.ReadFile("/tmp/mosdns_base.yaml")
 	if err != nil {
 		fmt.Println("Error reading template file:", err)
 		return
@@ -108,13 +114,10 @@ func AddMod() {
 	for sequenceTag, zones := range zoneMatches {
 		var zoneNames []string
 		for _, zone := range zones {
-			zoneName := zone.Zone
-			if !strings.Contains(zoneName, ":") {
-				zoneName = "domain:" + zoneName
-			}
-			zoneNames = append(zoneNames, zoneName)
+			zoneNames = append(zoneNames, processZones(zone.Zone)...)
 		}
-		matchConfig := fmt.Sprintf("        - matches: qname %s\n          exec: goto %s\n", strings.Join(zoneNames, " "), sequenceTag)
+		uniqueZoneNames := removeDuplicates(zoneNames)
+		matchConfig := fmt.Sprintf("        - matches: qname %s\n          exec: goto %s\n", strings.Join(uniqueZoneNames, " "), sequenceTag)
 		switch zones[0].Seq {
 		case "top6":
 			top6Config.WriteString(matchConfig)
@@ -124,7 +127,27 @@ func AddMod() {
 			topConfig.WriteString(matchConfig)
 		}
 	}
-	template = strings.Replace(template, "##zones_qname_top_start##\n##zones_qname_top_end##", "##zones_qname_top_start##\n"+topConfig.String()+"##zones_qname_top_end##", 1)
+
+	hostsByEnvKey := make(map[string][]string)
+	for _, host := range config.Hosts {
+		if envValue := os.Getenv(host.EnvKey); envValue != "" {
+			hostsByEnvKey[host.EnvKey] = append(hostsByEnvKey[host.EnvKey], host.Zone)
+		} else {
+			fmt.Printf("[PaoPaoDNS HOSTS]! Env key not found or empty: %s\n", host.EnvKey)
+		}
+	}
+
+	var hostsConfig strings.Builder
+	for envKey, zones := range hostsByEnvKey {
+		var allZones []string
+		for _, zone := range zones {
+			allZones = append(allZones, processZones(zone)...)
+		}
+		uniqueZones := removeDuplicates(allZones)
+		hostsConfig.WriteString(fmt.Sprintf("        - matches: qname %s\n          exec: ip_rewrite %s\n", strings.Join(uniqueZones, " "), envKey))
+	}
+
+	template = strings.Replace(template, "##zones_qname_top_start##\n##zones_qname_top_end##", "##zones_qname_top_start##\n"+hostsConfig.String()+topConfig.String()+"##zones_qname_top_end##", 1)
 	template = strings.Replace(template, "##zones_qname_top6_start##\n##zones_qname_top6_end##", "##zones_qname_top6_start##\n"+top6Config.String()+"##zones_qname_top6_end##", 1)
 	template = strings.Replace(template, "##zones_qname_list_start##\n##zones_qname_list_end##", "##zones_qname_list_start##\n"+listConfig.String()+"##zones_qname_list_end##", 1)
 
@@ -237,4 +260,37 @@ func generateSequencePlugin(tag, key string, zones []Zone, forwardPlugins map[st
         - exec: $%s
 %s        - exec: ok
 `, tag, forwardTag, ttlConfig)
+}
+
+func processZones(zoneString string) []string {
+	var processedZones []string
+	zones := strings.Fields(zoneString)
+
+	for _, zone := range zones {
+		if strings.HasPrefix(zone, "/") {
+			if _, err := os.Stat(zone); os.IsNotExist(err) {
+				fmt.Printf("[PaoPaoDNS ZONE]! File not found: %s\n", zone)
+				continue
+			}
+			processedZones = append(processedZones, "&"+zone)
+		} else if !strings.Contains(zone, ":") {
+			processedZones = append(processedZones, "domain:"+zone)
+		} else {
+			processedZones = append(processedZones, zone)
+		}
+	}
+
+	return processedZones
+}
+
+func removeDuplicates(slice []string) []string {
+	keys := make(map[string]bool)
+	list := []string{}
+	for _, entry := range slice {
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+	return list
 }
