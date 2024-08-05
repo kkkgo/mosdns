@@ -24,8 +24,8 @@ type Zone struct {
 }
 
 type Swap struct {
-	EnvKey   string `mapstructure:"env_key"`
-	CIDRFile string `mapstructure:"cidr_file"`
+	EnvKey    string   `mapstructure:"env_key"`
+	CIDRFiles []string `mapstructure:"cidr_file"`
 }
 
 type Host struct {
@@ -117,7 +117,7 @@ func AddMod() {
 			zoneNames = append(zoneNames, processZones(zone.Zone)...)
 		}
 		uniqueZoneNames := removeDuplicates(zoneNames)
-		matchConfig := fmt.Sprintf("        - matches: qname %s\n          exec: goto %s\n", strings.Join(uniqueZoneNames, " "), sequenceTag)
+		matchConfig := fmt.Sprintf("        - matches: \"qname  %s\"\n          exec: goto %s\n", strings.Join(uniqueZoneNames, " "), sequenceTag)
 		switch zones[0].Seq {
 		case "top6":
 			top6Config.WriteString(matchConfig)
@@ -144,7 +144,7 @@ func AddMod() {
 			allZones = append(allZones, processZones(zone)...)
 		}
 		uniqueZones := removeDuplicates(allZones)
-		hostsConfig.WriteString(fmt.Sprintf("        - matches: qname %s\n          exec: ip_rewrite %s\n", strings.Join(uniqueZones, " "), envKey))
+		hostsConfig.WriteString(fmt.Sprintf("        - matches: \"qname %s\"\n          exec: ip_hosts %s\n", strings.Join(uniqueZones, " "), envKey))
 	}
 
 	template = strings.Replace(template, "##zones_qname_top_start##\n##zones_qname_top_end##", "##zones_qname_top_start##\n"+hostsConfig.String()+topConfig.String()+"##zones_qname_top_end##", 1)
@@ -152,19 +152,18 @@ func AddMod() {
 	template = strings.Replace(template, "##zones_qname_list_start##\n##zones_qname_list_end##", "##zones_qname_list_start##\n"+listConfig.String()+"##zones_qname_list_end##", 1)
 
 	envKeyToCIDRFiles := make(map[string][]string)
-	seenCIDRFiles := make(map[string]bool)
 	for _, swap := range config.Swaps {
-		if _, err := os.Stat(swap.CIDRFile); os.IsNotExist(err) {
-			fmt.Printf("[PaoPaoDNS SWAP]! CIDR file not found: %s\n", swap.CIDRFile)
-			continue
-		}
 		if envValue := os.Getenv(swap.EnvKey); envValue != "" {
-			if seenCIDRFiles[swap.CIDRFile] {
-				fmt.Printf("[PaoPaoDNS SWAP]! CIDR file %s is already matched to an env_key, skipping\n", swap.CIDRFile)
-				continue
+			for _, cidrFile := range swap.CIDRFiles {
+				cidrFiles := strings.Fields(cidrFile)
+				for _, file := range cidrFiles {
+					if _, err := os.Stat(file); os.IsNotExist(err) {
+						fmt.Printf("[PaoPaoDNS SWAP]! CIDR file not found: %s\n", file)
+						continue
+					}
+					envKeyToCIDRFiles[swap.EnvKey] = append(envKeyToCIDRFiles[swap.EnvKey], file)
+				}
 			}
-			envKeyToCIDRFiles[swap.EnvKey] = append(envKeyToCIDRFiles[swap.EnvKey], swap.CIDRFile)
-			seenCIDRFiles[swap.CIDRFile] = true
 			fmt.Printf("[PaoPaoDNS SWAP] get: %s = %s\n", swap.EnvKey, envValue)
 		} else {
 			fmt.Printf("[PaoPaoDNS SWAP]! Env key not found or empty: %s\n", swap.EnvKey)
@@ -173,11 +172,8 @@ func AddMod() {
 
 	var matchConfig strings.Builder
 	for envKey, cidrFiles := range envKeyToCIDRFiles {
-		if len(cidrFiles) > 1 {
-			matchConfig.WriteString(fmt.Sprintf("        - matches: resp_ip &%s\n          exec: ip_rewrite %s\n", strings.Join(cidrFiles, " &"), envKey))
-		} else {
-			matchConfig.WriteString(fmt.Sprintf("        - matches: resp_ip &%s\n          exec: ip_rewrite %s\n", cidrFiles[0], envKey))
-		}
+		uniqueCIDRFiles := removeDuplicates(cidrFiles)
+		matchConfig.WriteString(fmt.Sprintf("        - matches: resp_ip &%s\n          exec: ip_rewrite %s \n", strings.Join(uniqueCIDRFiles, " &"), envKey))
 	}
 	template = strings.Replace(template, "##swaps_match_start##\n##swaps_match_end##", "##swaps_match_start##\n"+matchConfig.String()+"##swaps_match_end##", 1)
 

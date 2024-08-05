@@ -59,6 +59,7 @@ import (
 
 	_ "github.com/IrineSistiana/mosdns/v5/plugin/executable/black_hole"
 
+	_ "github.com/IrineSistiana/mosdns/v5/plugin/executable/ip_hosts"
 	_ "github.com/IrineSistiana/mosdns/v5/plugin/executable/ip_rewrite"
 
 	_ "github.com/IrineSistiana/mosdns/v5/plugin/executable/cache"

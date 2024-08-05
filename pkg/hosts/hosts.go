@@ -109,7 +109,7 @@ func (h *Hosts) LookupMsg(m *dns.Msg) *dns.Msg {
 		if addInfoEnabled && r != nil {
 			txtRecord := new(dns.TXT)
 			txtRecord.Hdr = dns.RR_Header{
-				Name:   time.Now().Format("20060102150405.0000000") + ".host.paopaodns.",
+				Name:   time.Now().Format("20060102150405.0000000") + ".usehosts.paopaodns.",
 				Rrtype: dns.TypeTXT,
 				Class:  dns.ClassINET,
 				Ttl:    301,

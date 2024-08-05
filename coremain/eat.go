@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -25,6 +26,8 @@ func Eatlist(args []string) {
 		processTrackersList()
 	case "ttl_rules":
 		processForceTTLRules()
+	case "hosts":
+		processHosts()
 	default:
 		os.Exit(1)
 	}
@@ -294,4 +297,50 @@ func processForceTTLRules() {
 	writeOutput("/tmp/force_ttl_rules.txt", txtRules)
 	writeOutput("/tmp/force_ttl_rules.toml", tomlRules)
 	writeOutput("/tmp/force_ttl_rules_cloaking.toml", cloakingRules)
+}
+func processHosts() {
+	file, err := os.Open("/etc/hosts")
+	if err != nil {
+		fmt.Printf("Error opening /etc/hosts file: %v\n", err)
+		return
+	}
+	defer file.Close()
+
+	linesMap := make(map[string]struct{})
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if len(line) > 0 && !strings.HasPrefix(line, "#") {
+			linesMap[line] = struct{}{}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		fmt.Printf("Error reading /etc/hosts file: %v\n", err)
+		return
+	}
+
+	result := make(map[string]struct{})
+	for line := range linesMap {
+		var record string
+		var domain string
+
+		parts := strings.Fields(line)
+		if len(parts) >= 2 {
+			if ip := net.ParseIP(parts[0]); ip != nil {
+				record = parts[0]
+				domain = parts[1]
+			} else if ip := net.ParseIP(parts[1]); ip != nil {
+				record = parts[1]
+				domain = parts[0]
+			}
+		}
+
+		if domain != "" && record != "" {
+			result[fmt.Sprintf("%s %s", domain, record)] = struct{}{}
+		}
+	}
+
+	writeOutput("/tmp/hosts.txt", result)
 }
