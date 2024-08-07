@@ -4,11 +4,13 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -28,6 +30,14 @@ func Eatlist(args []string) {
 		processForceTTLRules()
 	case "hosts":
 		processHosts()
+	case "calc":
+		if len(args) < 4 {
+			os.Exit(1)
+		}
+		ulimit := args[1]
+		numThreads := args[2]
+		mode := args[3]
+		calc(ulimit, numThreads, mode)
 	default:
 		os.Exit(1)
 	}
@@ -343,4 +353,42 @@ func processHosts() {
 	}
 
 	writeOutput("/tmp/hosts.txt", result)
+}
+
+func calc(ulimitStr string, numThreadsStr string, mode string) {
+	ulimit, err := strconv.Atoi(ulimitStr)
+	if err != nil {
+		fmt.Println("Error converting ulimit to integer:", err)
+		return
+	}
+
+	numThreads, err := strconv.Atoi(numThreadsStr)
+	if err != nil {
+		fmt.Println("Error converting numThreads to integer:", err)
+		return
+	}
+
+	var adjustedUlimit float64
+
+	switch mode {
+	case "r":
+		adjustedUlimit = float64(ulimit) * 0.7
+	case "f":
+		adjustedUlimit = float64(ulimit) * 0.2
+	default:
+		adjustedUlimit = float64(ulimit)
+	}
+
+	outgoingRange := int(math.Max(200, math.Min(adjustedUlimit-100, adjustedUlimit/float64(2*numThreads))))
+	if outgoingRange > 8192 {
+		outgoingRange = 8192
+	}
+
+	numQueriesPerThread := int(math.Max(100, float64(outgoingRange/(2*numThreads))))
+	if numQueriesPerThread > 4096 {
+		numQueriesPerThread = 4096
+	}
+
+	fmt.Printf("outgoing:%d:outgoing_half:%d:num-queries-per-thread:%d",
+		outgoingRange, outgoingRange/2, numQueriesPerThread)
 }
