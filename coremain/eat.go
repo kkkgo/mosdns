@@ -356,16 +356,14 @@ func processHosts() {
 }
 
 func calc(ulimitStr string, numThreadsStr string, mode string) {
-	ulimit, err := strconv.Atoi(ulimitStr)
-	if err != nil {
-		fmt.Println("Error converting ulimit to integer:", err)
-		return
+	ulimit, err1 := strconv.Atoi(ulimitStr)
+	if err1 != nil {
+		ulimit = 10240
 	}
 
-	numThreads, err := strconv.Atoi(numThreadsStr)
-	if err != nil {
-		fmt.Println("Error converting numThreads to integer:", err)
-		return
+	numThreads, err2 := strconv.Atoi(numThreadsStr)
+	if err2 != nil {
+		numThreads = 2
 	}
 
 	var adjustedUlimit float64
