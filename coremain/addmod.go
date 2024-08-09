@@ -173,7 +173,7 @@ func AddMod() {
 	var matchConfig strings.Builder
 	for envKey, cidrFiles := range envKeyToCIDRFiles {
 		uniqueCIDRFiles := removeDuplicates(cidrFiles)
-		matchConfig.WriteString(fmt.Sprintf("        - matches: resp_ip &%s\n          exec: ip_rewrite %s \n", strings.Join(uniqueCIDRFiles, " &"), envKey))
+		matchConfig.WriteString(fmt.Sprintf("        - matches: \"resp_ip &%s\"\n          exec: ip_rewrite %s \n", strings.Join(uniqueCIDRFiles, " &"), envKey))
 	}
 	template = strings.Replace(template, "##swaps_match_start##\n##swaps_match_end##", "##swaps_match_start##\n"+matchConfig.String()+"##swaps_match_end##", 1)
 
