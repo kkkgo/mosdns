@@ -3,7 +3,7 @@ module github.com/IrineSistiana/mosdns/v5
 go 1.22.6
 
 require (
-	github.com/miekg/dns v1.1.61
+	github.com/miekg/dns v1.1.62
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/oschwald/geoip2-golang v1.11.0
 	github.com/spf13/cobra v1.8.1
