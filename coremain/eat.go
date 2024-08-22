@@ -20,6 +20,13 @@ func Eatlist(args []string) {
 		os.Exit(1)
 	}
 	switch args[0] {
+	case "list":
+		if len(args) < 3 {
+			os.Exit(1)
+		}
+		outputPath := args[1]
+		inputFiles := args[2:]
+		processForcelist(inputFiles, outputPath)
 	case "cut":
 		cut()
 	case "spilt":
@@ -39,6 +46,7 @@ func Eatlist(args []string) {
 		mode := args[3]
 		calc(ulimit, numThreads, mode)
 	default:
+		fmt.Println("Unknown command")
 		os.Exit(1)
 	}
 }
@@ -389,4 +397,40 @@ func calc(ulimitStr string, numThreadsStr string, mode string) {
 
 	fmt.Printf("outgoing:%d:outgoing_half:%d:num-queries-per-thread:%d",
 		outgoingRange, outgoingRange/2, numQueriesPerThread)
+}
+
+func processForcelist(caseList []string, outputPath string) {
+	result := make(map[string]struct{})
+
+	for _, filePath := range caseList {
+		file, err := os.Open(filePath)
+		if err != nil {
+			continue
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			line := strings.TrimRight(scanner.Text(), "\r")
+			if !regexp.MustCompile(`^[a-zA-Z0-9]`).MatchString(line) {
+				continue
+			}
+
+			if strings.Contains(line, ":") {
+				parts := strings.SplitN(line, ":", 2)
+				if len(parts) != 2 {
+					continue
+				}
+				prefix := parts[0]
+				if prefix != "domain" && prefix != "full" && prefix != "regexp" && prefix != "keyword" {
+					continue
+				}
+			} else {
+				line = "domain:" + line
+			}
+
+			result[line] = struct{}{}
+		}
+	}
+	writeOutput(outputPath, result)
 }
