@@ -129,14 +129,20 @@ func loadConfig(filePath string) (*Config, string, error) {
 		return nil, "", fmt.Errorf("failed to read config: %w", err)
 	}
 
-	decoderOpt := func(cfg *mapstructure.DecoderConfig) {
-		cfg.ErrorUnused = true
-		cfg.TagName = "yaml"
-		cfg.WeaklyTypedInput = true
+	cfg := new(Config)
+	decoderConfig := &mapstructure.DecoderConfig{
+		ErrorUnused:      true,
+		TagName:          "yaml",
+		WeaklyTypedInput: true,
+		Result:           cfg,
 	}
 
-	cfg := new(Config)
-	if err := v.Unmarshal(cfg, decoderOpt); err != nil {
+	decoder, err := mapstructure.NewDecoder(decoderConfig)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create decoder: %w", err)
+	}
+
+	if err := decoder.Decode(v.AllSettings()); err != nil {
 		return nil, "", fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 	return cfg, v.ConfigFileUsed(), nil
