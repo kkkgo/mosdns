@@ -5,7 +5,7 @@ go 1.24.4
 require (
 	github.com/miekg/dns v1.1.66
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/oschwald/geoip2-golang v1.11.0
+	github.com/oschwald/geoip2-golang v1.13.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
 	go.uber.org/zap v1.27.0
