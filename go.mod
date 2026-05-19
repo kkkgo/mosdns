@@ -1,6 +1,6 @@
 module github.com/IrineSistiana/mosdns/v5
 
-go 1.26.2
+go 1.26.3
 
 require (
 	github.com/miekg/dns v1.1.72
