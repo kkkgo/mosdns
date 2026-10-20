@@ -1,6 +1,6 @@
 module github.com/IrineSistiana/mosdns/v5
 
-go 1.27.1
+go 1.27.2
 
 require (
 	github.com/miekg/dns v1.1.73
@@ -9,7 +9,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	go.uber.org/zap v1.28.0
-	golang.org/x/exp v0.0.0-20261011100332-faecfb24eb49
+	golang.org/x/exp v0.0.0-20261014143641-f0251eb4aa3e
 	golang.org/x/net v0.61.0
 	golang.org/x/sync v0.24.0
 	golang.org/x/sys v0.49.0
